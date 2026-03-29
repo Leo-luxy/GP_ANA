@@ -129,6 +129,9 @@ cython_debug/
 # Data files
 data/
 
+# Configuration files
+config.py
+
 # Temporary files
 *.tmp
 *.temp
