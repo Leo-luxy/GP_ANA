@@ -1,0 +1,14 @@
+yfinance
+pandas
+numpy==1.26.3
+pandas-datareader==0.10.0
+tushare==1.2.89
+akshare==1.18.39
+TA-Lib==0.6.8
+py_mini_racer
+requests==2.32.3
+matplotlib==3.9.2
+ollama==0.6.1
+demjson
+seaborn
+scikit-learn
