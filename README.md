@@ -263,6 +263,7 @@
 - schedule
 - requests
 - pyperclip
+- APScheduler
 
 ## 注意事项
 

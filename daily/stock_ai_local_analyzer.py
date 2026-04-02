@@ -19,6 +19,8 @@ import requests
 import time
 import os
 import sys
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -619,3 +621,163 @@ if __name__ == "__main__":
     
     # 运行分析
     analyzer.run_analysis()
+
+
+def run_all_stocks_analysis():
+    """运行所有股票的分析"""
+    from config import STOCK_TICKERS, DATA_DIR, TRADING_RECORDS
+    
+    print(f"\n=== 开始分析所有股票 (时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
+    
+    for ticker_name, ticker in STOCK_TICKERS.items():
+        print(f"\n--- 分析股票: {ticker} ({ticker_name}) ---")
+        
+        try:
+            file_path = f'{DATA_DIR}/{ticker}/{ticker}_indicators.csv'
+            
+            # 分析数据
+            analyzer = StockAILocalAnalyzer(file_path)
+            
+            # 先加载数据
+            analyzer.load_data()
+            
+            # 从交易记录计算持仓情况
+            if ticker in TRADING_RECORDS:
+                position = analyzer.calculate_position_from_trading_records(TRADING_RECORDS[ticker])
+                analyzer.set_position(
+                    position['shares'],
+                    position['average_price'],
+                    position['purchase_date']
+                )
+                print(f"从交易记录计算的持仓情况: {position['shares']}股，平均成本: {position['average_price']}元")
+            else:
+                print("配置文件中没有找到该股票的交易记录，无法计算持仓情况")
+            
+            # 从配置文件中获取交易记录
+            if ticker in TRADING_RECORDS:
+                for operation in TRADING_RECORDS[ticker]:
+                    analyzer.add_operation(
+                        operation['date'],
+                        operation['type'],
+                        operation['price'],
+                        operation['shares']
+                    )
+                print(f"使用配置文件中的交易记录，共{len(TRADING_RECORDS[ticker])}条")
+            else:
+                print("配置文件中没有找到该股票的交易记录")
+            
+            # 运行分析
+            analyzer.run_analysis()
+            
+        except Exception as e:
+            print(f"分析股票 {ticker} 时出错: {str(e)}")
+    
+    print(f"\n=== 所有股票分析完成 (时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===")
+
+
+def start_scheduled_run():
+    """启动定时运行任务"""
+    from config import SCHEDULED_RUN_CONFIG
+    
+    if not SCHEDULED_RUN_CONFIG['enabled']:
+        print("定时运行功能已禁用")
+        return
+    
+    scheduler = BlockingScheduler()
+    
+    # 获取配置
+    hour = SCHEDULED_RUN_CONFIG['hour']
+    minute = SCHEDULED_RUN_CONFIG['minute']
+    interval_days = SCHEDULED_RUN_CONFIG['interval_days']
+    
+    print(f"\n=== 启动定时运行任务 ===")
+    print(f"运行时间: 每天 {hour:02d}:{minute:02d}")
+    print(f"运行间隔: {interval_days} 天")
+    print(f"分析股票数量: {len(SCHEDULED_RUN_CONFIG['stocks'])}")
+    print("按 Ctrl+C 停止定时任务")
+    
+    # 添加定时任务
+    scheduler.add_job(
+        run_all_stocks_analysis,
+        CronTrigger(hour=hour, minute=minute, day='*/{}'.format(interval_days)),
+        id='stock_analysis_job',
+        name='Stock Analysis Scheduled Job',
+        replace_existing=True
+    )
+    
+    # 立即运行一次
+    run_all_stocks_analysis()
+    
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        print("\n定时任务已停止")
+        scheduler.shutdown()
+
+
+if __name__ == "__main__":
+    import argparse
+    
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description="使用本地Ollama AI分析股票")
+    parser.add_argument('--ticker', help="股票代码，例如：600519.SS（上交所）、000001.SZ（深交所），默认使用config.py中的第一个股票")
+    parser.add_argument('--scheduled', action='store_true', help="启用定时运行模式")
+    args = parser.parse_args()
+    
+    if args.scheduled:
+        # 启动定时运行
+        start_scheduled_run()
+    else:
+        # 从配置文件中获取股票代码
+        from config import STOCK_TICKERS
+        
+        # 确定股票代码
+        if args.ticker:
+            ticker = args.ticker
+            # 查找对应的股票名称
+            ticker_name = ticker
+            for name, code in STOCK_TICKERS.items():
+                if code == ticker:
+                    ticker_name = name
+                    break
+        else:
+            # 使用第一个股票代码进行分析
+            ticker_name, ticker = next(iter(STOCK_TICKERS.items()))
+            print(f"使用配置文件中的股票代码: {ticker} ({ticker_name})")
+        
+        file_path = f'{DATA_DIR}/{ticker}/{ticker}_indicators.csv'
+        print(f"分析股票: {ticker} ({ticker_name})")
+        
+        # 分析数据
+        analyzer = StockAILocalAnalyzer(file_path)
+        
+        # 先加载数据
+        analyzer.load_data()
+        
+        # 从交易记录计算持仓情况
+        if ticker in TRADING_RECORDS:
+            position = analyzer.calculate_position_from_trading_records(TRADING_RECORDS[ticker])
+            analyzer.set_position(
+                position['shares'],
+                position['average_price'],
+                position['purchase_date']
+            )
+            print(f"从交易记录计算的持仓情况: {position['shares']}股，平均成本: {position['average_price']}元")
+        else:
+            print("配置文件中没有找到该股票的交易记录，无法计算持仓情况")
+        
+        # 从配置文件中获取交易记录
+        if ticker in TRADING_RECORDS:
+            for operation in TRADING_RECORDS[ticker]:
+                analyzer.add_operation(
+                    operation['date'],
+                    operation['type'],
+                    operation['price'],
+                    operation['shares']
+                )
+            print(f"使用配置文件中的交易记录，共{len(TRADING_RECORDS[ticker])}条")
+        else:
+            print("配置文件中没有找到该股票的交易记录")
+        
+        # 运行分析
+        analyzer.run_analysis()

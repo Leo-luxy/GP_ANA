@@ -233,6 +233,18 @@ This system is used for stock data crawling, analysis, and strategy backtesting,
    - Run `stock_ai_local_analyzer.py` to get AI analysis report
      - Default analysis for the first stock: `python stock_ai_local_analyzer.py`
      - Specify stock analysis: `python stock_ai_local_analyzer.py --ticker 300433.SZ`
+   - **External large model API configuration**:
+     - Set external_api parameters in AI_CONFIG in config.py
+     - Example configuration:
+       ```python
+       'external_api': {
+           'enabled': True,  # Enable external API
+           'api_key': 'your_api_key_here',  # Your API key
+           'api_url': 'https://api.openai.com/v1/chat/completions',  # API address (example for OpenAI)
+           'model': 'gpt-4'  # Model name
+       }
+       ```
+     - Supports any large model service that conforms to the OpenAI API format
 8. **Weekly analysis**: Run the corresponding scripts in the weekly directory for weekly analysis
 9. **Automated operation**: Run `automation_system.py` to set up scheduled tasks
 
