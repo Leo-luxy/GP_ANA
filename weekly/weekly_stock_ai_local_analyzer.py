@@ -378,6 +378,14 @@ class WeeklyStockAILocalAnalyzer:
         return prompt
     
     def get_ai_analysis(self, prompt):
+        """获取AI分析结果，优先使用外部API，否则使用本地Ollama"""
+        # 检查是否启用了外部API
+        if AI_CONFIG.get('external_api', {}).get('enabled', False):
+            return self.get_external_ai_analysis(prompt)
+        else:
+            return self.get_local_ai_analysis(prompt)
+    
+    def get_local_ai_analysis(self, prompt):
         """获取本地Ollama AI分析结果"""
         import ollama
         
@@ -389,7 +397,7 @@ class WeeklyStockAILocalAnalyzer:
             
             print(f"正在请求本地Ollama AI ({model})...")
             # 配置Ollama客户端使用localhost
-            client = ollama.Client(host='http://localhost:11434')
+            client = ollama.Client(host=AI_CONFIG.get('base_url', 'http://localhost:11434'))
             
             response = client.chat(
                 model=model,
@@ -408,6 +416,48 @@ class WeeklyStockAILocalAnalyzer:
             print(f"调用本地Ollama AI时出错: {str(e)}")
             # 返回默认分析结果
             return "无法获取AI分析，请检查Ollama服务是否正常运行。"
+    
+    def get_external_ai_analysis(self, prompt):
+        """获取外部大模型API分析结果"""
+        try:
+            import requests
+            
+            # 获取外部API配置
+            external_api = AI_CONFIG['external_api']
+            api_key = external_api['api_key']
+            api_url = external_api['api_url']
+            model = external_api['model']
+            
+            print(f"正在请求外部大模型API ({model})...")
+            
+            # 构建请求参数
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            data = {
+                'model': model,
+                'messages': [
+                    {"role": "system", "content": "你是一位专业的金融分析师，擅长股票技术分析和投资建议。"},
+                    {"role": "user", "content": prompt}
+                ],
+                'temperature': AI_CONFIG.get('temperature', 0.3),
+                'max_tokens': AI_CONFIG.get('max_tokens', 4000)
+            }
+            
+            # 发送请求
+            response = requests.post(api_url, headers=headers, json=data, timeout=60)
+            response.raise_for_status()  # 检查响应状态
+            
+            # 解析响应
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except Exception as e:
+            print(f"调用外部大模型API时出错: {str(e)}")
+            # 回退到本地Ollama
+            print("回退到本地Ollama AI...")
+            return self.get_local_ai_analysis(prompt)
     
     def save_analysis_to_md(self, analysis_content):
         """将分析结果保存为markdown文件"""

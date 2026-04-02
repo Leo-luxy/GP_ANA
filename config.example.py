@@ -34,7 +34,14 @@ AI_CONFIG = {
     'base_url': 'http://localhost:11434',  # Deepseek API基础URL
     'model': 'qwen3.5:397b-cloud', # 'qwen3.5:35b',  # 使用的AI模型
     'temperature': 0.3,  # 生成文本的随机性
-    'max_tokens': 4000  # 最大响应长度
+    'max_tokens': 4000,  # 最大响应长度
+    # 外部大模型API配置
+    'external_api': {
+        'enabled': False,  # 是否启用外部API
+        'api_key': '',  # API密钥
+        'api_url': '',  # API地址
+        'model': ''  # 外部模型名称
+    }
 }
 
 # 数据目录配置
