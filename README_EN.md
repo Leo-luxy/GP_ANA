@@ -28,8 +28,9 @@ This system is used for stock data crawling, analysis, and strategy backtesting,
 ### 1. Configuration Files
 - **config.py**
   - Function: Store system configuration parameters
-  - Content: Stock codes, position information, trading records, historical data date range, technical indicator parameters, etc.
+  - Content: Stock codes, position information, trading records, historical data date range, technical indicator parameters, AI model configuration, etc.
   - Output: None
+  - Note: config.py contains private information and has been added to .gitignore, please copy config.example.py to config.py and fill in the actual configuration
 
 ### 2. Data Crawling
 - **stock_history_collector_ta_v2.py**

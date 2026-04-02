@@ -28,8 +28,9 @@
 ### 1. 配置文件
 - **config.py**
   - 功能：存储系统配置参数
-  - 内容：股票代码、持仓情况、交易记录、历史数据日期范围、技术指标参数等
+  - 内容：股票代码、持仓情况、交易记录、历史数据日期范围、技术指标参数、AI模型配置等
   - 产出物：无
+  - 注意：config.py包含私人信息，已被添加到.gitignore中，请复制config.example.py为config.py并填写实际配置
 
 ### 2. 数据抓取
 - **stock_history_collector_ta_v2.py**
@@ -117,14 +118,15 @@
     - 指定股票分析：`python daily/ai_model.py --ticker 300433.SZ`
 
 - **stock_ai_local_analyzer.py**
-  - 功能：将股票数据发送给本地Ollama AI进行分析
-  - 实现原理：加载股票数据，生成AI提示词，获取AI分析结果
+  - 功能：将股票数据发送给AI进行分析，支持外部大模型API和本地Ollama
+  - 实现原理：加载股票数据，生成AI提示词，优先使用外部API，失败后回退到本地Ollama
   - 产出物：
     - `./data/{ticker}/{ticker}_{timestamp}.md` - AI分析报告
     - `./data/{ticker}/{ticker}_support_resistance.png` - 支撑阻力位分析图表
   - 调用方法：
     - 默认分析第一只股票：`python stock_ai_local_analyzer.py`
     - 指定股票分析：`python stock_ai_local_analyzer.py --ticker 300433.SZ`
+  - 外部API配置：在config.py的AI_CONFIG中设置external_api参数
 
 - **daily/stock_ai_analyzer.py**
   - 功能：整理股票支撑数据、持仓情况和操作情况，生成AI提示词
@@ -169,10 +171,11 @@
   - 调用方法：`python weekly/weekly_stock_analyzer.py`
 
 - **weekly/weekly_stock_ai_local_analyzer.py**
-  - 功能：周线AI分析
-  - 实现原理：将周线数据发送给本地Ollama AI进行分析
+  - 功能：周线AI分析，支持外部大模型API和本地Ollama
+  - 实现原理：将周线数据发送给AI进行分析，优先使用外部API，失败后回退到本地Ollama
   - 产出物：周线AI分析报告
   - 调用方法：`python weekly/weekly_stock_ai_local_analyzer.py`
+  - 外部API配置：在config.py的AI_CONFIG中设置external_api参数
 
 - **weekly/weekly_stock_prediction.py**
   - 功能：周线价格预测
@@ -232,6 +235,18 @@
    - 运行`stock_ai_local_analyzer.py`获取AI分析报告
      - 默认分析第一只股票：`python stock_ai_local_analyzer.py`
      - 指定股票分析：`python stock_ai_local_analyzer.py --ticker 300433.SZ`
+   - **外部大模型API配置**：
+     - 在config.py的AI_CONFIG中设置external_api参数
+     - 示例配置：
+       ```python
+       'external_api': {
+           'enabled': True,  # 启用外部API
+           'api_key': 'your_api_key_here',  # 你的API密钥
+           'api_url': 'https://api.openai.com/v1/chat/completions',  # API地址（示例为OpenAI）
+           'model': 'gpt-4'  # 模型名称
+       }
+       ```
+     - 支持任何符合OpenAI API格式的大模型服务
 8. **周线分析**：运行weekly目录下的相应脚本进行周线分析
 9. **自动化运行**：运行`automation_system.py`设置定时任务
 
