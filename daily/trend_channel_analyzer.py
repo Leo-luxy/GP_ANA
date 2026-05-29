@@ -94,24 +94,24 @@ class TrendChannelAnalyzer:
             self.data['RSI'] = 100 - (100 / (1 + rs))
         
         # 计算MACD（如果数据中没有）
-        if 'MACD' not in self.data.columns:
+        if 'DIF' not in self.data.columns:
             exp1 = self.data['close'].ewm(span=12, adjust=False).mean()
             exp2 = self.data['close'].ewm(span=26, adjust=False).mean()
-            self.data['MACD'] = exp1 - exp2
-            self.data['MACD_signal'] = self.data['MACD'].ewm(span=9, adjust=False).mean()
+            self.data['DIF'] = exp1 - exp2
+            self.data['DEA'] = self.data['DIF'].ewm(span=9, adjust=False).mean()
         
         # 趋势判断
         sideways_margin = self.params['sideways_margin']
         
-        # 上升趋势：MA20斜率大于横盘裕度，且价格在通道中上部，且MACD>0
+        # 上升趋势：MA20斜率大于横盘裕度，且价格在通道中上部，且DIF>DEA
         self.data['uptrend'] = ((self.data['MA20_slope'] > sideways_margin) & 
                               (self.data['close'] > self.data['MA20']) &
-                              (self.data['MACD'] > self.data['MACD_signal'])).astype(int)
+                              (self.data['DIF'] > self.data['DEA'])).astype(int)
         
-        # 下降趋势：MA20斜率小于负的横盘裕度，且价格在通道中下部，且MACD<0
+        # 下降趋势：MA20斜率小于负的横盘裕度，且价格在通道中下部，且DIF<DEA
         self.data['downtrend'] = ((self.data['MA20_slope'] < -sideways_margin) & 
                                (self.data['close'] < self.data['MA20']) &
-                               (self.data['MACD'] < self.data['MACD_signal'])).astype(int)
+                               (self.data['DIF'] < self.data['DEA'])).astype(int)
         
         # 无明显趋势（横盘）：斜率绝对值小于横盘裕度，或不满足上升/下降趋势条件
         self.data['sideways'] = ((self.data['uptrend'] == 0) & 

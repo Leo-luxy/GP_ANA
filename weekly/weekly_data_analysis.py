@@ -136,15 +136,15 @@ class WeeklyDataAnalyzer:
             plt.grid(True)
         
         # MACD
-        if 'MACD' in self.data.columns and 'MACD_signal' in self.data.columns:
+        if 'DIF' in self.data.columns and 'DEA' in self.data.columns:
             plt.subplot(3, 1, 3)
-            plt.plot(self.data['week_start'], self.data['MACD'], label='MACD', color='blue')
-            plt.plot(self.data['week_start'], self.data['MACD_signal'], label='MACD Signal', color='red')
+            plt.plot(self.data['week_start'], self.data['DIF'], label='DIF', color='blue')
+            plt.plot(self.data['week_start'], self.data['DEA'], label='DEA', color='red')
             if 'MACD_hist' in self.data.columns:
-                plt.bar(self.data['week_start'], self.data['MACD_hist'], label='MACD Hist', color='green', alpha=0.5)
+                plt.bar(self.data['week_start'], self.data['MACD_hist'], label='MACD柱状图', color='green', alpha=0.5)
             plt.title(f'{self.ticker} 周线MACD指标')
             plt.xlabel('日期')
-            plt.ylabel('MACD')
+            plt.ylabel('DIF/DEA')
             plt.legend()
             plt.grid(True)
         
@@ -189,7 +189,7 @@ class WeeklyDataAnalyzer:
             os.makedirs(stock_dir)
         
         # 选择关键技术指标
-        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'MACD', 'RSI_6', 'CCI', 'WR']
+        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'DIF', 'RSI_6', 'CCI', 'WR']
         available_indicators = [ind for ind in indicators if ind in self.data.columns]
         
         # 计算相关性矩阵

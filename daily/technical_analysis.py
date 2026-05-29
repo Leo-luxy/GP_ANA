@@ -51,7 +51,7 @@ class TechnicalAnalyzer:
         self.data['MA_crossover'] = self.data['MA5_above_MA20'].diff()
         
         # 2. MACD信号
-        self.data['MACD_above_signal'] = (self.data['MACD'] > self.data['MACD_signal']).astype(int)
+        self.data['MACD_above_signal'] = (self.data['DIF'] > self.data['DEA']).astype(int)
         self.data['MACD_crossover'] = self.data['MACD_above_signal'].diff()
         
         # 3. RSI超买超卖信号

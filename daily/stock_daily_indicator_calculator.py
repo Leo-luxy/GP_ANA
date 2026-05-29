@@ -101,7 +101,7 @@ def save_results(df, ticker, output_dir=None):
         'MA5', 'MA10', 'MA20', 'MA50', 'MA60', 'MA120', 'MA200',
         'VOL5', 'VOL10', 'VOL20', 'Volume_Ratio',
         'K', 'D', 'J',
-        'MACD', 'MACD_signal', 'MACD_hist',
+        'DIF', 'DEA', 'MACD_hist',
         'BB_upper', 'BB_middle', 'BB_lower', 'BB_std', 'BB_width',
         'ATR',
         'RSI', 'RSI_6', 'RSI_24',
@@ -121,6 +121,8 @@ def save_results(df, ticker, output_dir=None):
         'Momentum',
         'Price_MA5_Ratio', 'Price_MA20_Ratio', 'Price_MA60_Ratio',
         'Volume_VOL5_Ratio', 'Volume_VOL20_Ratio',
+        'MFI',
+        'BB_pctB',
         'VWAP',
         'Volatility',
         'ticker'
@@ -162,7 +164,7 @@ def save_results(df, ticker, output_dir=None):
     
     # 保存文件
     try:
-        df.to_csv(file_path, index=False)
+        df.to_csv(file_path, index=False, encoding='utf-8-sig')
         print(f"计算结果已保存到: {file_path}")
     except Exception as e:
         print(f"保存文件时出错: {str(e)}")

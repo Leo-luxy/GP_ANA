@@ -114,12 +114,12 @@ class DataAnalyzer:
         
         # MACD
         plt.subplot(3, 1, 1)
-        plt.plot(self.data['date'], self.data['MACD'], label='MACD', color='blue')
-        plt.plot(self.data['date'], self.data['MACD_signal'], label='Signal', color='red')
-        plt.bar(self.data['date'], self.data['MACD_hist'], label='Histogram', color='green', alpha=0.5)
+        plt.plot(self.data['date'], self.data['DIF'], label='DIF', color='blue')
+        plt.plot(self.data['date'], self.data['DEA'], label='DEA', color='red')
+        plt.bar(self.data['date'], self.data['MACD_hist'], label='MACD柱状图', color='green', alpha=0.5)
         plt.title(f'{self.ticker} MACD指标')
         plt.xlabel('日期')
-        plt.ylabel('MACD')
+        plt.ylabel('DIF/DEA')
         plt.legend()
         plt.grid(True)
         
@@ -188,7 +188,7 @@ class DataAnalyzer:
             os.makedirs(stock_dir)
         
         # 选择关键技术指标
-        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'MACD', 'RSI', 'CCI', 'WR']
+        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'DIF', 'RSI', 'CCI', 'WR']
         
         # 计算相关性矩阵
         corr_matrix = self.data[indicators].corr()

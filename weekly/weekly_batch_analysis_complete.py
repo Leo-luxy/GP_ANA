@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # weekly_batch_analysis_complete.py
 # 功能：批量对多只股票执行完整的周线分析流程
 # 实现原理：
