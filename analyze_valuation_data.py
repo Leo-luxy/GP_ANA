@@ -371,7 +371,7 @@ def save_analysis_result(ticker, analysis_content):
     os.makedirs(stock_dir, exist_ok=True)
     
     # 生成文件名
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime('%Y%m%d')
     filename = f"{ticker}_valuation_analysis_{timestamp}.md"
     file_path = os.path.join(stock_dir, filename)
     

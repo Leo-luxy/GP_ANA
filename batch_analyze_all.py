@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # batch_analyze_all.py
 # 功能：批量对多只股票执行完整的分析流程
 # 实现原理：
@@ -69,8 +69,16 @@ def main():
         run_command(f"python analyze_valuation_data.py --ticker {stock_code}")
         
         # 7. 技术趋势分析
-        print("\n7. 执行 analyze_technical_trend.py")
-        run_command(f"python analyze_technical_trend.py --ticker {stock_code}")
+        print("\n7. 执行 analyze_technical_trend_ds.py")
+        run_command(f"python analyze_technical_trend_ds.py --ticker {stock_code}")
+        
+        # 8. 股票财务数据分析
+        print("\n8. 执行 analyze_em_financial.py")
+        run_command(f"python analyze_em_financial.py --ticker {stock_code}")
+        
+        # 9. 业绩预告与分红分析
+        print("\n9. 执行 analyze_performance_forecast.py")
+        run_command(f"python analyze_performance_forecast.py --ticker {stock_code}")
         
         print(f"\n=====================================")
         print(f"股票 {stock_code} 分析完成")
@@ -110,8 +118,16 @@ def main():
             run_command(f"python analyze_valuation_data.py --ticker {stock_code}")
             
             # 7. 技术趋势分析
-            print("\n7. 执行 analyze_technical_trend.py")
-            run_command(f"python analyze_technical_trend.py --ticker {stock_code}")
+            print("\n7. 执行 analyze_technical_trend_ds.py")
+            run_command(f"python analyze_technical_trend_ds.py --ticker {stock_code}")
+            
+            # 8. 股票财务数据分析
+            print("\n8. 执行 analyze_em_financial.py")
+            run_command(f"python analyze_em_financial.py --ticker {stock_code}")
+            
+            # 9. 业绩预告与分红分析
+            print("\n9. 执行 analyze_performance_forecast.py")
+            run_command(f"python analyze_performance_forecast.py --ticker {stock_code}")
             
             print(f"\n=====================================")
             print(f"股票 {stock_name} ({stock_code}) 分析完成")

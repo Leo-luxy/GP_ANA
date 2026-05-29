@@ -41,8 +41,8 @@ def calculate_technical_indicators(data_df):
         
         # 计算MACD指标
         macd, macd_signal, macd_hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-        data_df['MACD'] = macd
-        data_df['MACD_signal'] = macd_signal
+        data_df['DIF'] = macd
+        data_df['DEA'] = macd_signal
         data_df['MACD_hist'] = macd_hist
         
         # 计算布林带
@@ -119,6 +119,12 @@ def calculate_technical_indicators(data_df):
         # 计算成交量与各均量的关系
         data_df['Volume_VOL5_Ratio'] = data_df['volume'] / data_df['VOL5']
         data_df['Volume_VOL20_Ratio'] = data_df['volume'] / data_df['VOL20']
+        
+        # 计算MFI指标
+        data_df['MFI'] = talib.MFI(high, low, close, data_df['volume'], timeperiod=14)
+        
+        # 计算BB_pctB指标
+        data_df['BB_pctB'] = (close - data_df['BB_lower']) / (data_df['BB_upper'] - data_df['BB_lower'])
     else:
         # 使用自己实现的方法计算技术指标
         # 计算MA指标
@@ -147,9 +153,9 @@ def calculate_technical_indicators(data_df):
         # 计算MACD指标
         exp1 = data_df['close'].ewm(span=12, adjust=False).mean()
         exp2 = data_df['close'].ewm(span=26, adjust=False).mean()
-        data_df['MACD'] = exp1 - exp2
-        data_df['MACD_signal'] = data_df['MACD'].ewm(span=9, adjust=False).mean()
-        data_df['MACD_hist'] = data_df['MACD'] - data_df['MACD_signal']
+        data_df['DIF'] = exp1 - exp2
+        data_df['DEA'] = data_df['DIF'].ewm(span=9, adjust=False).mean()
+        data_df['MACD_hist'] = data_df['DIF'] - data_df['DEA']
         
         # 计算布林带
         data_df['BB_middle'] = data_df['close'].rolling(window=20).mean()
@@ -278,6 +284,28 @@ def calculate_technical_indicators(data_df):
         # 计算成交量与各均量的关系
         data_df['Volume_VOL5_Ratio'] = data_df['volume'] / data_df['VOL5']
         data_df['Volume_VOL20_Ratio'] = data_df['volume'] / data_df['VOL20']
+        
+        # 计算MFI指标
+        def calculate_mfi(high, low, close, volume, period=14):
+            # 计算典型价格
+            typical_price = (high + low + close) / 3
+            # 计算资金流量
+            money_flow = typical_price * volume
+            # 计算资金流量变化
+            money_flow_change = money_flow.diff()
+            # 计算正资金流量和负资金流量
+            positive_mf = money_flow_change.where(money_flow_change > 0, 0)
+            negative_mf = -money_flow_change.where(money_flow_change < 0, 0)
+            # 计算14天移动平均
+            positive_mf_14 = positive_mf.rolling(window=period).sum()
+            negative_mf_14 = negative_mf.rolling(window=period).sum()
+            # 计算MFI
+            mfi = 100 - (100 / (1 + (positive_mf_14 / negative_mf_14)))
+            return mfi
+        data_df['MFI'] = calculate_mfi(data_df['high'], data_df['low'], data_df['close'], data_df['volume'])
+        
+        # 计算BB_pctB指标
+        data_df['BB_pctB'] = (data_df['close'] - data_df['BB_lower']) / (data_df['BB_upper'] - data_df['BB_lower'])
     
     # 计算VWAP指标（无论是否使用TA-Lib都计算）
     data_df['VWAP'] = (data_df['close'] * data_df['volume']).cumsum() / data_df['volume'].cumsum()

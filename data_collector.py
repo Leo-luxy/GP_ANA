@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# data_collector.py
 # -*- coding:utf-8 -*-
 """
 Date: 2026/1/9 22:00

@@ -22,30 +22,35 @@ from config import DATA_DIR, AI_CONFIG
 def load_company_info(ticker):
     """加载公司信息文件"""
     stock_dir = os.path.join(DATA_DIR, ticker)
-    # 尝试不同的文件名格式
-    info_files = [
-        os.path.join(stock_dir, f"{ticker}_company_info.json"),
-        os.path.join(stock_dir, "company_info.json")
-    ]
     
-    info_file = None
-    for f in info_files:
-        if os.path.exists(f):
-            info_file = f
-            break
-    
-    if not info_file:
-        print(f"文件不存在: {info_files}")
+    # 加载公司基本信息
+    basic_info_file = os.path.join(stock_dir, f"{ticker}_company_basic.json")
+    if not os.path.exists(basic_info_file):
+        print(f"公司基本信息文件不存在: {basic_info_file}")
         return None
     
     try:
-        with open(info_file, 'r', encoding='utf-8') as f:
+        with open(basic_info_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        print(f"成功加载 {ticker} 的公司信息文件: {info_file}")
-        return data
+        print(f"成功加载 {ticker} 的公司基本信息文件: {basic_info_file}")
     except Exception as e:
-        print(f"加载文件时出错: {str(e)}")
+        print(f"加载公司基本信息文件时出错: {str(e)}")
         return None
+    
+    # 加载研究报告数据
+    import pandas as pd
+    
+    # 加载研究报告数据
+    research_reports_file = os.path.join(stock_dir, f"{ticker}_research_reports.csv")
+    if os.path.exists(research_reports_file):
+        try:
+            research_reports_df = pd.read_csv(research_reports_file)
+            data['research_reports'] = research_reports_df.to_dict('records')
+            print(f"成功加载 {ticker} 的研究报告数据: {research_reports_file}")
+        except Exception as e:
+            print(f"加载研究报告数据时出错: {str(e)}")
+    
+    return data
 
 def extract_research_reports_data(data):
     """提取研究报告相关数据"""
@@ -231,7 +236,7 @@ def save_analysis_result(ticker, analysis_content):
     os.makedirs(stock_dir, exist_ok=True)
     
     # 生成文件名
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime('%Y%m%d')
     filename = f"{ticker}_research_reports_analysis_{timestamp}.md"
     file_path = os.path.join(stock_dir, filename)
     

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # stock_ai_comprehensive_analyzer.py
 # 功能：综合股票的财务报表、资金流、融资融券和估值分析报告，发送给本地Ollama AI进行综合分析
 # 实现原理：
@@ -23,7 +22,8 @@ import akshare as ak
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATA_DIR, AI_CONFIG, TRADING_RECORDS
+from config import DATA_DIR, AI_CONFIG
+from trading_records import TRADING_RECORDS
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['Arial Unicode MS']  # 用于macOS的中文字体
@@ -33,156 +33,43 @@ class StockAIComprehensiveAnalyzer:
     def __init__(self, file_path, model="qwen3:30b"):
         self.file_path = file_path
         self.model = model
-        self.data = None
         self.ticker = None
-        self.support_levels = []
-        self.resistance_levels = []
-        self.position = {}
-        self.recent_operations = []
         self.analysis_reports = {
             'financial_statements': {},
             'fund_flow': {},
             'margin_data': {},
-            'valuation': {}
+            'valuation': {},
+            'eastmoney_financial': {},
+            'performance_forecast': {},
+            'shareholder_structure': {},
+            'research_reports': {}
         }
     
     def load_data(self):
         """加载数据"""
-        print(f"加载数据文件: {self.file_path}")
-        self.data = pd.read_csv(self.file_path)
+        # 从文件路径中提取股票代码
+        file_name = os.path.basename(self.file_path)
+        self.ticker = file_name.split('_')[0]
+        print(f"加载股票: {self.ticker}")
         
-        # 转换日期格式
-        if 'date' in self.data.columns:
-            self.data['date'] = pd.to_datetime(self.data['date'])
+        # 从技术趋势分析JSON文件中获取数据
+        stock_dir = os.path.join(DATA_DIR, self.ticker)
+        trend_file = os.path.join(stock_dir, f"{self.ticker}_technical_trend_analysis.json")
         
-        # 获取股票代码
-        if 'ticker' in self.data.columns:
-            self.ticker = self.data['ticker'].iloc[0]
+        if os.path.exists(trend_file):
+            print(f"加载技术趋势分析文件: {trend_file}")
+            with open(trend_file, 'r', encoding='utf-8') as f:
+                self.technical_trend_data = json.load(f)
         else:
-            # 从文件路径中提取股票代码
-            file_name = os.path.basename(self.file_path)
-            self.ticker = file_name.split('_')[0]
+            print(f"技术趋势分析文件不存在: {trend_file}")
+            self.technical_trend_data = {}
         
-        return self.data
+        return self.ticker
     
-    def calculate_support_resistance(self):
-        """计算支撑位和阻力位"""
-        # 使用简单的方法计算支撑位和阻力位
-        # 1. 使用近期最低价作为支撑位
-        # 2. 使用近期最高价作为阻力位
-        # 3. 使用移动平均线作为动态支撑/阻力
-        
-        # 获取最近30天的数据
-        recent_data = self.data.tail(30)
-        
-        # 计算支撑位
-        # 最低价格
-        support_low = recent_data['low'].min()
-        self.support_levels.append({
-            'type': '最低价格',
-            'value': round(support_low, 2),
-            'date': recent_data[recent_data['low'] == support_low]['date'].iloc[0].strftime('%Y-%m-%d')
-        })
-        
-        # 50日均线作为支撑
-        if 'MA50' in recent_data.columns:
-            ma50_support = recent_data['MA50'].iloc[-1]
-            self.support_levels.append({
-                'type': 'MA50支撑',
-                'value': round(ma50_support, 2),
-                'date': recent_data['date'].iloc[-1].strftime('%Y-%m-%d')
-            })
-        
-        # 计算阻力位
-        # 最高价格
-        resistance_high = recent_data['high'].max()
-        self.resistance_levels.append({
-            'type': '最高价格',
-            'value': round(resistance_high, 2),
-            'date': recent_data[recent_data['high'] == resistance_high]['date'].iloc[0].strftime('%Y-%m-%d')
-        })
-        
-        # 50日均线作为阻力
-        if 'MA50' in recent_data.columns:
-            ma50_resistance = recent_data['MA50'].iloc[-1]
-            self.resistance_levels.append({
-                'type': 'MA50阻力',
-                'value': round(ma50_resistance, 2),
-                'date': recent_data['date'].iloc[-1].strftime('%Y-%m-%d')
-            })
-        
-        # 布林带上下轨
-        if 'BB_upper' in recent_data.columns and 'BB_lower' in recent_data.columns:
-            bb_upper = recent_data['BB_upper'].iloc[-1]
-            bb_lower = recent_data['BB_lower'].iloc[-1]
-            self.resistance_levels.append({
-                'type': '布林带上轨',
-                'value': round(bb_upper, 2),
-                'date': recent_data['date'].iloc[-1].strftime('%Y-%m-%d')
-            })
-            self.support_levels.append({
-                'type': '布林带下轨',
-                'value': round(bb_lower, 2),
-                'date': recent_data['date'].iloc[-1].strftime('%Y-%m-%d')
-            })
-    
-    def set_position(self, shares, average_price, purchase_date):
-        """设置持仓情况"""
-        self.position = {
-            'shares': shares,
-            'average_price': average_price,
-            'purchase_date': purchase_date,
-            'current_price': self.data['close'].iloc[-1],
-            'unrealized_pnl': round((self.data['close'].iloc[-1] - average_price) * shares, 2),
-            'unrealized_pnl_percent': round((self.data['close'].iloc[-1] - average_price) / average_price * 100, 2)
-        }
-    
-    def add_operation(self, date, type, price, shares):
-        """添加操作记录"""
-        operation = {
-            'date': date,
-            'type': type,  # 'buy' 或 'sell'
-            'price': price,
-            'shares': shares,
-            'amount': round(price * shares, 2)
-        }
-        self.recent_operations.append(operation)
-    
-    def calculate_position_from_trading_records(self, trading_records):
-        """从交易记录计算持仓情况"""
-        total_shares = 0
-        total_investment = 0  # 总投入资金
-        total_return = 0     # 总回收资金
-        purchase_date = None
-        
-        # 按日期排序交易记录
-        sorted_records = sorted(trading_records, key=lambda x: x['date'])
-        
-        for record in sorted_records:
-            if record['type'] == 'buy':
-                total_shares += record['shares']
-                total_investment += record['price'] * record['shares']
-                # 更新购买日期为最后一次买入日期
-                purchase_date = record['date']
-            elif record['type'] == 'sell':
-                total_shares -= record['shares']
-                total_return += record['price'] * record['shares']
-        
-        # 计算剩余成本和平均成本
-        remaining_cost = total_investment - total_return
-        if total_shares > 0:
-            average_price = remaining_cost / total_shares
-        else:
-            average_price = 0
-        
-        return {
-            'shares': total_shares,
-            'average_price': round(average_price, 3),
-            'purchase_date': purchase_date
-        }
+
     
     def get_stock_info(self):
-        """从company_info.json文件中获取股票基本信息"""
+        """从company_basic.json文件中获取股票基本信息"""
         stock_info = {
             'name': '',
             'industry': '',
@@ -190,13 +77,20 @@ class StockAIComprehensiveAnalyzer:
             'pb': '',
             'market_cap': '',
             'total_assets': '',
-            'main_business': ''
+            'main_business': '',
+            'full_name': '',
+            'registered_capital': '',
+            'employee_count': '',
+            'em_industry': '',
+            'csrc_industry': '',
+            'actual_controller': '',
+            'sector_hierarchy': ''
         }
         
         try:
             # 构建固定的公司信息文件路径
             stock_dir = os.path.join(DATA_DIR, self.ticker)
-            info_file = os.path.join(stock_dir, f"{self.ticker}_company_info.json")
+            info_file = os.path.join(stock_dir, f"{self.ticker}_company_basic.json")
             
             # 检查文件是否存在
             if not os.path.exists(info_file):
@@ -216,6 +110,13 @@ class StockAIComprehensiveAnalyzer:
                 stock_info['name'] = basic_info.get('公司简称', '')
                 stock_info['industry'] = basic_info.get('所属行业', '')
                 stock_info['main_business'] = basic_info.get('主营业务', '')
+                stock_info['full_name'] = basic_info.get('公司全称', '')
+                stock_info['registered_capital'] = basic_info.get('注册资本', '')
+                stock_info['employee_count'] = basic_info.get('员工人数', '')
+                stock_info['em_industry'] = basic_info.get('EM2016行业分类', '')
+                stock_info['csrc_industry'] = basic_info.get('CSRC行业分类', '')
+                stock_info['actual_controller'] = basic_info.get('实际控制人', '')
+                stock_info['sector_hierarchy'] = basic_info.get('板块名称层级', '')
             
             # 从CSV文件中读取估值信息
             valuation_file = os.path.join(stock_dir, f"{self.ticker}_valuation.csv")
@@ -276,7 +177,7 @@ class StockAIComprehensiveAnalyzer:
         return realtime_info
     
     def get_company_details(self):
-        """从stock_company_info_v2生成的文件中获取公司详细信息"""
+        """从company_basic.json文件中获取公司详细信息"""
         company_details = {
             'full_name': '',
             'business_scope': '',
@@ -287,7 +188,7 @@ class StockAIComprehensiveAnalyzer:
         try:
             # 构建固定的公司信息文件路径
             stock_dir = os.path.join(DATA_DIR, self.ticker)
-            info_file = os.path.join(stock_dir, f"{self.ticker}_company_info.json")
+            info_file = os.path.join(stock_dir, f"{self.ticker}_company_basic.json")
             
             # 检查文件是否存在
             if not os.path.exists(info_file):
@@ -306,6 +207,10 @@ class StockAIComprehensiveAnalyzer:
                 company_details['full_name'] = basic_info.get('公司全称', '')
                 company_details['business_scope'] = basic_info.get('经营范围', '')
             
+            # 提取经营范围（如果basic_info中没有）
+            if not company_details['business_scope'] and 'business_scope' in data:
+                company_details['business_scope'] = data['business_scope']
+            
             # 提取数据来源
             if 'data_sources' in data:
                 company_details['data_sources'] = data['data_sources']
@@ -323,13 +228,21 @@ class StockAIComprehensiveAnalyzer:
         import glob
         
         if report_type == 'financial_statements':
-            pattern = f"{self.ticker}_financial_statements_analysis_*.md"
+            pattern = f"{self.ticker}_financial_analysis_*.md"
         elif report_type == 'fund_flow':
             pattern = f"{self.ticker}_fund_flow_analysis_*.md"
         elif report_type == 'margin_data':
             pattern = f"{self.ticker}_margin_data_analysis_*.md"
         elif report_type == 'valuation':
             pattern = f"{self.ticker}_valuation_analysis_*.md"
+        elif report_type == 'eastmoney_financial':
+            pattern = f"{self.ticker}_em_financial_analysis_*.md"
+        elif report_type == 'performance_forecast':
+            pattern = f"{self.ticker}_performance_analysis_*.md"
+        elif report_type == 'shareholder_structure':
+            pattern = f"{self.ticker}_shareholder_structure_analysis_*.md"
+        elif report_type == 'research_reports':
+            pattern = f"{self.ticker}_research_reports_analysis_*.md"
         else:
             return {}
         
@@ -367,7 +280,8 @@ class StockAIComprehensiveAnalyzer:
     
     def load_analysis_reports(self):
         """加载所有分析报告"""
-        report_types = ['financial_statements', 'fund_flow', 'margin_data', 'valuation']
+        report_types = ['financial_statements', 'fund_flow', 'margin_data', 'valuation', 
+                      'eastmoney_financial', 'performance_forecast', 'shareholder_structure', 'research_reports']
         for report_type in report_types:
             self.analysis_reports[report_type] = self.read_analysis_report(report_type)
         
@@ -405,9 +319,6 @@ class StockAIComprehensiveAnalyzer:
     
     def get_stock_summary(self):
         """获取股票综合信息"""
-        # 获取最新数据
-        latest = self.data.iloc[-1]
-        
         # 获取股票基本信息
         stock_info = self.get_stock_info()
         
@@ -418,32 +329,10 @@ class StockAIComprehensiveAnalyzer:
         realtime_info = self.get_realtime_stock_info()
         
         summary = {
-            'ticker': self.ticker,
-            'name': stock_info['name'],
-            'industry': stock_info['industry'],
-            'current_price': round(latest['close'], 2),
-            'date': latest['date'].strftime('%Y-%m-%d'),
             'realtime_info': realtime_info,
-            'support_levels': self.support_levels,
-            'resistance_levels': self.resistance_levels,
-            'position': self.position,
-            'recent_operations': self.recent_operations,
             'company_details': company_details,
             'analysis_reports': self.analysis_reports,
-            'technical_indicators': {
-                'MA5': round(latest.get('MA5', 0), 2),
-                'MA10': round(latest.get('MA10', 0), 2),
-                'MA20': round(latest.get('MA20', 0), 2),
-                'RSI': round(latest.get('RSI', 0), 2),
-                'MACD': round(latest.get('MACD', 0), 4),
-                'MACD_signal': round(latest.get('MACD_signal', 0), 4),
-                'KDJ_K': round(latest.get('K', 0), 2),
-                'KDJ_D': round(latest.get('D', 0), 2),
-                'KDJ_J': round(latest.get('J', 0), 2),
-                'ATR': round(latest.get('ATR', 0), 2),
-                'OBV': round(latest.get('OBV', 0), 2),
-                'ADX': round(latest.get('ADX', 0), 2)
-            }
+            'stock_info': stock_info
         }
         
         return summary
@@ -456,13 +345,6 @@ class StockAIComprehensiveAnalyzer:
         
         prompt = f"""你是一位专业的金融分析师，擅长股票技术分析和投资建议。请基于以下股票数据和综合分析报告，提供详细的分析和操作建议：
 
-=== 股票基本信息 ===
-股票代码: {summary['ticker']}
-股票名称: {summary['name']}
-所属行业: {summary['industry']}
-当前价格: {summary['current_price']} 元
-分析日期: {summary['date']}
-
 === 公司详细信息 ===
 """
         
@@ -474,37 +356,36 @@ class StockAIComprehensiveAnalyzer:
         if company_details.get('data_sources'):
             prompt += f"- 数据来源: {', '.join(company_details['data_sources'])}\n"
         
-        # 添加支撑位和阻力位分析
-        prompt += "\n=== 支撑位分析 ===\n"
-        for support in summary['support_levels']:
-            prompt += f"- {support['type']}: {support['value']} 元 (形成日期: {support['date']})\n"
+        # 添加公司基本信息
+        stock_info = summary.get('stock_info', {})
+        if stock_info.get('full_name'):
+            prompt += f"- 公司全称: {stock_info['full_name']}\n"
+        if stock_info.get('registered_capital'):
+            # 将注册资本从万元换算为亿元并标注单位
+            try:
+                registered_capital = float(stock_info['registered_capital'])
+                registered_capital_billion = round(registered_capital / 10000, 2)
+                prompt += f"- 注册资本: {registered_capital_billion} 亿元\n"
+            except (ValueError, TypeError):
+                prompt += f"- 注册资本: {stock_info['registered_capital']}\n"
+        if stock_info.get('employee_count'):
+            prompt += f"- 员工人数: {stock_info['employee_count']}\n"
+        if stock_info.get('main_business'):
+            prompt += f"- 主营业务: {stock_info['main_business']}\n"
+        if stock_info.get('em_industry'):
+            prompt += f"- EM2016行业分类: {stock_info['em_industry']}\n"
+        if stock_info.get('csrc_industry'):
+            prompt += f"- CSRC行业分类: {stock_info['csrc_industry']}\n"
+        if stock_info.get('actual_controller'):
+            prompt += f"- 实际控制人: {stock_info['actual_controller']}\n"
+        if stock_info.get('sector_hierarchy'):
+            prompt += f"- 板块名称层级: {stock_info['sector_hierarchy']}\n"
         
-        prompt += "\n=== 阻力位分析 ===\n"
-        for resistance in summary['resistance_levels']:
-            prompt += f"- {resistance['type']}: {resistance['value']} 元 (形成日期: {resistance['date']})\n"
-        
-        # 添加持仓情况
-        prompt += "\n=== 持仓情况 ===\n"
-        if summary['position']:
-            prompt += f"- 持仓数量: {summary['position']['shares']} 股\n"
-            prompt += f"- 平均成本: {summary['position']['average_price']} 元\n"
-            prompt += f"- 购买日期: {summary['position']['purchase_date']}\n"
-            prompt += f"- 浮动盈亏: {summary['position']['unrealized_pnl']} 元 ({summary['position']['unrealized_pnl_percent']}%)\n"
-        else:
-            prompt += "- 暂无持仓\n"
-        
-        # 添加近期操作记录
-        prompt += "\n=== 近期操作记录 ===\n"
-        if summary['recent_operations']:
-            for op in summary['recent_operations']:
-                prompt += f"- {op['date']}: {op['type']} {op['shares']} 股 @ {op['price']} 元\n"
-        else:
-            prompt += "- 暂无近期操作\n"
-        
-        # 添加技术指标数据
-        prompt += "\n=== 技术指标数据 ===\n"
-        for indicator, value in summary['technical_indicators'].items():
-            prompt += f"- {indicator}: {value}\n"
+        # 添加技术趋势分析JSON全文
+        if analysis_reports.get('technical_trend'):
+            technical_trend = analysis_reports['technical_trend']
+            prompt += "\n=== 技术趋势分析JSON全文 ===\n"
+            prompt += json.dumps(technical_trend, ensure_ascii=False, indent=2) + "\n"
         
         # 添加实时股票信息
         if summary.get('realtime_info'):
@@ -555,31 +436,102 @@ class StockAIComprehensiveAnalyzer:
                     prompt += f"- {key}: {value}\n"
         
         # 添加技术趋势分析
-        if analysis_reports.get('technical_trend'):
-            prompt += "\n=== 技术趋势分析 ===\n"
-            technical_trend = analysis_reports['technical_trend']
-            if 'indicator_trends' in technical_trend:
-                for indicator, trend in technical_trend['indicator_trends'].items():
-                    prompt += f"- {indicator}: {trend}\n"
-            if 'technical_indicators' in technical_trend:
-                prompt += "\n技术指标最新值:\n"
-                for indicator, value in technical_trend['technical_indicators'].items():
-                    prompt += f"- {indicator}: {value}\n"
+        # 暂时屏蔽技术趋势分析文本内容的生成，避免与JSON部分重复
+        # if analysis_reports.get('technical_trend'):
+        #     prompt += "\n=== 技术趋势分析 ===\n"
+        #     technical_trend = analysis_reports['technical_trend']
+        #     if 'indicator_trends' in technical_trend:
+        #         for indicator, trend in technical_trend['indicator_trends'].items():
+        #             prompt += f"- {indicator}: {trend}\n"
+        #     if 'technical_indicators' in technical_trend:
+        #         prompt += "\n技术指标最新值:\n"
+        #         for indicator, value in technical_trend['technical_indicators'].items():
+        #             prompt += f"- {indicator}: {value}\n"
+        #     if 'trend_confidence' in technical_trend:
+        #         prompt += "\n趋势信心度:\n"
+        #         for trend, confidence in technical_trend['trend_confidence'].items():
+        #             prompt += f"- {trend}: {confidence}\n"
+        #     if 'trading_signal' in technical_trend:
+        #         prompt += "\n交易信号:\n"
+        #         trading_signal = technical_trend['trading_signal']
+        #         prompt += f"- 操作: {trading_signal.get('action', 'N/A')}\n"
+        #         prompt += f"- 信心度: {trading_signal.get('confidence', 'N/A')}\n"
+        #         prompt += f"- 理由: {trading_signal.get('reason', 'N/A')}\n"
+        #     if 'signal_conflicts' in technical_trend:
+        #         prompt += "\n信号冲突:\n"
+        #         for conflict in technical_trend['signal_conflicts']:
+        #             prompt += f"- {conflict}\n"
+        #     if 'risk_metrics' in technical_trend:
+        #         prompt += "\n风险指标:\n"
+        #         for metric, value in technical_trend['risk_metrics'].items():
+        #             prompt += f"- {metric}: {value}\n"
+        #     if 'price_action' in technical_trend and 'volatility_regime' in technical_trend['price_action']:
+        #         prompt += f"\n波动率状态: {technical_trend['price_action']['volatility_regime']}\n"
+        #     if 'multi_timeframe' in technical_trend:
+        #         prompt += "\n多周期趋势:\n"
+        #         multi_timeframe = technical_trend['multi_timeframe']
+        #         prompt += f"- 周线趋势: {multi_timeframe.get('weekly_trend', 'N/A')}\n"
+        #         prompt += f"- 日线趋势: {multi_timeframe.get('daily_trend', 'N/A')}\n"
+        #         prompt += f"- 背离: {multi_timeframe.get('divergence', 'N/A')}\n"
+        #     if 'consistency_score' in technical_trend:
+        #         prompt += f"\n指标一致性评分: {technical_trend['consistency_score']}\n"
+        #     if 'market_snapshot' in technical_trend:
+        #         prompt += f"\n市场快照: {technical_trend['market_snapshot']}\n"
+        
+        # 添加股票财务分析
+        if analysis_reports.get('eastmoney_financial'):
+            prompt += "\n=== 股票财务分析 ===\n"
+            eastmoney_financial = analysis_reports['eastmoney_financial']
+            if '全文' in eastmoney_financial:
+                prompt += eastmoney_financial['全文']
+            else:
+                for key, value in eastmoney_financial.items():
+                    prompt += f"- {key}: {value}\n"
+        
+        # 添加业绩预告与分红分析
+        if analysis_reports.get('performance_forecast'):
+            prompt += "\n=== 业绩预告与分红分析 ===\n"
+            performance_forecast = analysis_reports['performance_forecast']
+            if '全文' in performance_forecast:
+                prompt += performance_forecast['全文']
+            else:
+                for key, value in performance_forecast.items():
+                    prompt += f"- {key}: {value}\n"
+        
+        # 添加股东结构分析
+        if analysis_reports.get('shareholder_structure'):
+            prompt += "\n=== 股东结构分析 ===\n"
+            shareholder_structure = analysis_reports['shareholder_structure']
+            if '全文' in shareholder_structure:
+                prompt += shareholder_structure['全文']
+            else:
+                for key, value in shareholder_structure.items():
+                    prompt += f"- {key}: {value}\n"
+        
+        # 添加研究报告分析
+        if analysis_reports.get('research_reports'):
+            prompt += "\n=== 研究报告分析 ===\n"
+            research_reports = analysis_reports['research_reports']
+            if '全文' in research_reports:
+                prompt += research_reports['全文']
+            else:
+                for key, value in research_reports.items():
+                    prompt += f"- {key}: {value}\n"
+        
+        # 添加交易记录信息
+        prompt += "\n=== 交易记录 ===\n"
+        if self.ticker in TRADING_RECORDS:
+            for operation in TRADING_RECORDS[self.ticker]:
+                prompt += f"- 日期: {operation['date']}, 类型: {operation['type']}, 价格: {operation['price']}, 数量: {operation['shares']}\n"
+        else:
+            prompt += "暂无持仓及交易\n"
         
         # 添加分析要求
-        prompt += """\n=== 综合分析要求 ===\n请基于以上所有数据和分析报告，提供以下内容：\n1. 股票当前技术面分析（趋势、动量、量能等）\n2. 支撑位和阻力位的有效性分析\n3. 针对当前持仓的具体操作建议\n4. 短期（1-2周）和中期（1-3个月）市场展望\n5. 具体的买入/卖出点位建议和止损止盈设置\n6. 风险评估和资金管理建议\n7. 结合公司基本信息和行业情况的分析\n8. 基于财报数据的财务状况分析\n9. 基于资金流数据的市场情绪分析\n10. 基于融资融券数据的多空力量分析\n11. 基于估值数据的投资价值分析\n12. 综合四个分析报告的结论，给出最终的投资建议\n\n请提供详细、专业的分析，基于数据和技术指标，避免泛泛而谈。"""
+        prompt += """\n=== 综合分析要求 ===\n请基于以上所有数据和分析报告，提供以下内容：\n1. 股票当前技术面分析（趋势、动量、量能等）\n2. 支撑位和阻力位的有效性分析\n3. 针对当前持仓的具体操作建议\n4. 短期（1-2周）和中期（1-3个月）市场展望\n5. 具体的买入/卖出点位建议和止损止盈设置\n6. 风险评估和资金管理建议\n7. 结合公司基本信息和行业情况的分析\n8. 基于财报数据的财务状况分析\n9. 基于资金流数据的市场情绪分析\n10. 基于融资融券数据的多空力量分析\n11. 基于估值数据的投资价值分析\n12. 基于东方财富财务数据的深度财务分析\n13. 基于业绩预告与分红数据的盈利预期分析\n14. 基于股东结构数据的股权结构分析\n15. 基于研究报告数据的机构观点分析\n16. 综合所有分析报告的结论，给出最终的投资建议\n\n请提供详细、专业的分析，基于数据和技术指标，避免泛泛而谈。"""
         
         return prompt
     
     def get_ai_analysis(self, prompt):
-        """获取AI分析结果，优先使用外部API，否则使用本地Ollama"""
-        # 检查是否启用了外部API
-        if AI_CONFIG.get('external_api', {}).get('enabled', False):
-            return self.get_external_ai_analysis(prompt)
-        else:
-            return self.get_local_ai_analysis(prompt)
-    
-    def get_local_ai_analysis(self, prompt):
         """获取本地Ollama AI分析结果"""
         try:
             import ollama
@@ -601,7 +553,7 @@ class StockAIComprehensiveAnalyzer:
                 ],
                 options={
                     "temperature": temperature,  # 降低随机性，提高准确性
-                    "max_tokens": max_tokens*2  # 足够的响应长度
+                    "max_tokens": max_tokens*3  # 足够的响应长度
                 }
             )
             
@@ -611,52 +563,10 @@ class StockAIComprehensiveAnalyzer:
             # 返回默认分析结果
             return "无法获取AI分析，请检查Ollama服务是否正常运行。"
     
-    def get_external_ai_analysis(self, prompt):
-        """获取外部大模型API分析结果"""
-        try:
-            import requests
-            
-            # 获取外部API配置
-            external_api = AI_CONFIG['external_api']
-            api_key = external_api['api_key']
-            api_url = external_api['api_url']
-            model = external_api['model']
-            
-            print(f"正在请求外部大模型API ({model})...")
-            
-            # 构建请求参数
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}'
-            }
-            
-            data = {
-                'model': model,
-                'messages': [
-                    {"role": "system", "content": "你是一位专业的金融分析师，擅长股票技术分析和投资建议。"},
-                    {"role": "user", "content": prompt}
-                ],
-                'temperature': AI_CONFIG.get('temperature', 0.3),
-                'max_tokens': AI_CONFIG.get('max_tokens', 4000)
-            }
-            
-            # 发送请求
-            response = requests.post(api_url, headers=headers, json=data, timeout=60)
-            response.raise_for_status()  # 检查响应状态
-            
-            # 解析响应
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        except Exception as e:
-            print(f"调用外部大模型API时出错: {str(e)}")
-            # 回退到本地Ollama
-            print("回退到本地Ollama AI...")
-            return self.get_local_ai_analysis(prompt)
-    
     def save_analysis_to_md(self, analysis_content):
         """将分析结果保存为markdown文件"""
-        # 获取股票综合信息
-        summary = self.get_stock_summary()
+        # 获取股票基本信息
+        stock_info = self.get_stock_info()
         
         # 确保数据目录存在
         stock_dir = os.path.join(DATA_DIR, self.ticker)
@@ -666,63 +576,80 @@ class StockAIComprehensiveAnalyzer:
             os.makedirs(stock_dir)
         
         # 生成文件名：股票代码+时间戳
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime('%Y%m%d')
         filename = f"{self.ticker}_comprehensive_analysis_{timestamp}.md"
         file_path = os.path.join(stock_dir, filename)
         
+        # 从技术趋势分析JSON文件中获取数据
+        current_price = 0
+        analysis_date = datetime.now().strftime('%Y-%m-%d')
+        technical_indicators = {}
+        
+        if hasattr(self, 'technical_trend_data') and self.technical_trend_data:
+            # 获取当前价格
+            if 'technical_indicators' in self.technical_trend_data:
+                ti = self.technical_trend_data['technical_indicators']
+                current_price = ti.get('close', 0)
+                # 构建技术指标字典
+                technical_indicators = {
+                    'MA5': round(ti.get('MA5', 0), 2),
+                    'MA10': round(ti.get('MA10', 0), 2),
+                    'MA20': round(ti.get('MA20', 0), 2),
+                    'RSI': round(ti.get('RSI', 0), 2),
+                    'DIF': round(ti.get('DIF', 0), 4),
+                    'DEA': round(ti.get('DEA', 0), 4),
+                    'KDJ_K': round(ti.get('K', 0), 2),
+                    'KDJ_D': round(ti.get('D', 0), 2),
+                    'KDJ_J': round(ti.get('J', 0), 2),
+                    'ATR': round(ti.get('ATR', 0), 2),
+                    'OBV': round(ti.get('OBV', 0), 2),
+                    'ADX': round(ti.get('ADX', 0), 2)
+                }
+            # 获取分析日期
+            if 'meta' in self.technical_trend_data:
+                analysis_date = self.technical_trend_data['meta'].get('last_data_date', analysis_date)
+        
         # 构建markdown内容
-        md_content = f"""# {summary['name']} ({self.ticker}) 股票综合分析报告
+        md_content = f"""# {stock_info['name']} ({self.ticker}) 股票综合分析报告
 
 ## 分析时间
 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## 股票基本信息
 - 股票代码: {self.ticker}
-- 股票名称: {summary['name']}
-- 所属行业: {summary['industry']}
-- 当前价格: {self.data['close'].iloc[-1]:.2f} 元
-- 分析基准日期: {self.data['date'].iloc[-1].strftime('%Y-%m-%d')}
+- 股票名称: {stock_info['name']}
+- 所属行业: {stock_info['industry']}
+- 当前价格: {current_price:.2f} 元
+- 分析基准日期: {analysis_date}
 
 ## 支撑位分析
+- 支撑位数据已从技术趋势分析JSON全文中获取
+
+## 阻力位分析
+- 阻力位数据已从技术趋势分析JSON全文中获取
+
+## 持仓情况
+- 持仓情况数据已从技术趋势分析JSON全文中获取
+
+## 近期操作记录
+- 近期操作记录数据已从技术趋势分析JSON全文中获取
+
+## 技术指标数据
 """
         
-        for support in self.support_levels:
-            md_content += f"- {support['type']}: {support['value']} 元 (形成日期: {support['date']})\n"
-        
-        md_content += "\n## 阻力位分析\n"
-        for resistance in self.resistance_levels:
-            md_content += f"- {resistance['type']}: {resistance['value']} 元 (形成日期: {resistance['date']})\n"
-        
-        md_content += "\n## 持仓情况\n"
-        if self.position:
-            md_content += f"- 持仓数量: {self.position['shares']} 股\n"
-            md_content += f"- 平均成本: {self.position['average_price']} 元\n"
-            md_content += f"- 购买日期: {self.position['purchase_date']}\n"
-            md_content += f"- 浮动盈亏: {self.position['unrealized_pnl']} 元 ({self.position['unrealized_pnl_percent']}%)\n"
-        else:
-            md_content += "- 暂无持仓\n"
-        
-        md_content += "\n## 近期操作记录\n"
-        if self.recent_operations:
-            for op in self.recent_operations:
-                md_content += f"- {op['date']}: {op['type']} {op['shares']} 股 @ {op['price']} 元\n"
-        else:
-            md_content += "- 暂无近期操作\n"
-        
-        md_content += "\n## 技术指标数据\n"
-        for indicator, value in summary['technical_indicators'].items():
+        for indicator, value in technical_indicators.items():
             md_content += f"- {indicator}: {value}\n"
         
         # 添加实时股票信息
-        if summary.get('realtime_info'):
-            realtime_info = summary['realtime_info']
+        realtime_info = self.get_realtime_stock_info()
+        if realtime_info:
             md_content += "\n## 实时股票信息\n"
             # 添加所有字段
             for key, value in realtime_info.items():
                 md_content += f"- {key}: {value}\n"
         
         # 添加分析报告全文
-        analysis_reports = summary.get('analysis_reports', {})
+        analysis_reports = self.analysis_reports
         if analysis_reports.get('financial_statements'):
             md_content += "\n## 财务报表分析全文\n"
             financial_report = analysis_reports['financial_statements']
@@ -771,6 +698,79 @@ class StockAIComprehensiveAnalyzer:
                 md_content += "\n### 技术指标最新值\n"
                 for indicator, value in technical_trend['technical_indicators'].items():
                     md_content += f"- {indicator}: {value}\n"
+            if 'trend_confidence' in technical_trend:
+                md_content += "\n### 趋势信心度\n"
+                for trend, confidence in technical_trend['trend_confidence'].items():
+                    md_content += f"- {trend}: {confidence}\n"
+            if 'trading_signal' in technical_trend:
+                md_content += "\n### 交易信号\n"
+                trading_signal = technical_trend['trading_signal']
+                md_content += f"- 操作: {trading_signal.get('action', 'N/A')}\n"
+                md_content += f"- 信心度: {trading_signal.get('confidence', 'N/A')}\n"
+                md_content += f"- 理由: {trading_signal.get('reason', 'N/A')}\n"
+            if 'signal_conflicts' in technical_trend:
+                md_content += "\n### 信号冲突\n"
+                for conflict in technical_trend['signal_conflicts']:
+                    md_content += f"- {conflict}\n"
+            if 'risk_metrics' in technical_trend:
+                md_content += "\n### 风险指标\n"
+                for metric, value in technical_trend['risk_metrics'].items():
+                    md_content += f"- {metric}: {value}\n"
+            if 'price_action' in technical_trend and 'volatility_regime' in technical_trend['price_action']:
+                md_content += f"\n### 波动率状态\n"
+                md_content += f"- {technical_trend['price_action']['volatility_regime']}\n"
+            if 'multi_timeframe' in technical_trend:
+                md_content += "\n### 多周期趋势\n"
+                multi_timeframe = technical_trend['multi_timeframe']
+                md_content += f"- 周线趋势: {multi_timeframe.get('weekly_trend', 'N/A')}\n"
+                md_content += f"- 日线趋势: {multi_timeframe.get('daily_trend', 'N/A')}\n"
+                md_content += f"- 背离: {multi_timeframe.get('divergence', 'N/A')}\n"
+            if 'consistency_score' in technical_trend:
+                md_content += "\n### 指标一致性评分\n"
+                md_content += f"- {technical_trend['consistency_score']}\n"
+            if 'market_snapshot' in technical_trend:
+                md_content += "\n### 市场快照\n"
+                md_content += f"- {technical_trend['market_snapshot']}\n"
+        
+        # 添加股票财务分析
+        if analysis_reports.get('eastmoney_financial'):
+            md_content += "\n## 东方财富财务分析全文\n"
+            eastmoney_financial = analysis_reports['eastmoney_financial']
+            if '全文' in eastmoney_financial:
+                md_content += eastmoney_financial['全文']
+            else:
+                for key, value in eastmoney_financial.items():
+                    md_content += f"- {key}: {value}\n"
+        
+        # 添加业绩预告与分红分析
+        if analysis_reports.get('performance_forecast'):
+            md_content += "\n## 业绩预告与分红分析全文\n"
+            performance_forecast = analysis_reports['performance_forecast']
+            if '全文' in performance_forecast:
+                md_content += performance_forecast['全文']
+            else:
+                for key, value in performance_forecast.items():
+                    md_content += f"- {key}: {value}\n"
+        
+        # 添加股东结构分析
+        if analysis_reports.get('shareholder_structure'):
+            md_content += "\n## 股东结构分析全文\n"
+            shareholder_structure = analysis_reports['shareholder_structure']
+            if '全文' in shareholder_structure:
+                md_content += shareholder_structure['全文']
+            else:
+                for key, value in shareholder_structure.items():
+                    md_content += f"- {key}: {value}\n"
+        
+        # 添加研究报告分析
+        if analysis_reports.get('research_reports'):
+            md_content += "\n## 研究报告分析全文\n"
+            research_reports = analysis_reports['research_reports']
+            if '全文' in research_reports:
+                md_content += research_reports['全文']
+            else:
+                for key, value in research_reports.items():
+                    md_content += f"- {key}: {value}\n"
         
         md_content += "\n## AI综合分析结果\n"
         md_content += analysis_content
@@ -782,63 +782,10 @@ class StockAIComprehensiveAnalyzer:
         print(f"综合分析报告已保存为: {file_path}")
         return file_path
     
-    def plot_support_resistance(self):
-        """绘制支撑位和阻力位图表"""
-        plt.figure(figsize=(15, 8))
-        
-        # 确保数据目录存在
-        stock_dir = os.path.join(DATA_DIR, self.ticker)
-        if not os.path.exists(DATA_DIR):
-            os.makedirs(DATA_DIR)
-        if not os.path.exists(stock_dir):
-            os.makedirs(stock_dir)
-        
-        # 绘制价格走势
-        plt.plot(self.data['date'], self.data['close'], label='收盘价', color='blue')
-        
-        # 绘制移动平均线
-        if 'MA5' in self.data.columns:
-            plt.plot(self.data['date'], self.data['MA5'], label='MA5', color='red', linestyle='--')
-        if 'MA20' in self.data.columns:
-            plt.plot(self.data['date'], self.data['MA20'], label='MA20', color='green', linestyle='--')
-        if 'MA50' in self.data.columns:
-            plt.plot(self.data['date'], self.data['MA50'], label='MA50', color='purple', linestyle='--')
-        
-        # 绘制支撑位和阻力位
-        for support in self.support_levels:
-            plt.axhline(y=support['value'], color='green', linestyle='--', alpha=0.5)
-            plt.text(self.data['date'].iloc[0], support['value'], f"支撑: {support['value']} ({support['type']})", 
-                     color='green', fontsize=10, verticalalignment='bottom')
-        
-        for resistance in self.resistance_levels:
-            plt.axhline(y=resistance['value'], color='red', linestyle='--', alpha=0.5)
-            plt.text(self.data['date'].iloc[0], resistance['value'], f"阻力: {resistance['value']} ({resistance['type']})", 
-                     color='red', fontsize=10, verticalalignment='top')
-        
-        # 标记持仓成本
-        if self.position:
-            plt.axhline(y=self.position['average_price'], color='orange', linestyle='-', alpha=0.7)
-            plt.text(self.data['date'].iloc[0], self.position['average_price'], 
-                     f"持仓成本: {self.position['average_price']}", 
-                     color='orange', fontsize=10, verticalalignment='bottom')
-        
-        plt.title(f'{self.ticker} 价格走势与支撑阻力位分析')
-        plt.xlabel('日期')
-        plt.ylabel('价格')
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        
-        # 保存图表
-        chart_path = os.path.join(stock_dir, f'{self.ticker}_support_resistance.png')
-        plt.savefig(chart_path)
-        print(f"支撑阻力位分析图表已保存为: {chart_path}")
+
     
-    def save_prompt_to_md(self, prompt):
-        """保存提示词相关内容到Markdown文件"""
-        # 获取股票综合信息
-        summary = self.get_stock_summary()
-        
+    def save_prompt_to_txt(self, prompt):
+        """保存提示词相关内容到TXT文件"""
         # 确保数据目录存在
         stock_dir = os.path.join(DATA_DIR, self.ticker)
         if not os.path.exists(DATA_DIR):
@@ -847,101 +794,22 @@ class StockAIComprehensiveAnalyzer:
             os.makedirs(stock_dir)
         
         # 生成文件名：股票代码+时间戳
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{self.ticker}_prompt_info_{timestamp}.md"
+        timestamp = datetime.now().strftime('%Y%m%d')
+        filename = f"{self.ticker}_prompt_info_{timestamp}.txt"
         file_path = os.path.join(stock_dir, filename)
         
-        # 构建Markdown内容
-        md_content = f"""# {summary['name']} ({self.ticker}) 提示词信息
-
-## 分析时间
-{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## 股票基本信息
-- 股票代码: {summary['ticker']}
-- 股票名称: {summary['name']}
-- 所属行业: {summary['industry']}
-- 当前价格: {summary['current_price']} 元
-- 分析日期: {summary['date']}
-
-## 支撑位分析
-"""
+        # 构建TXT内容
+        txt_content = f"{self.ticker} 提示词信息\n"
+        txt_content += "=" * 80 + "\n"
+        txt_content += f"分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
-        for support in summary['support_levels']:
-            md_content += f"- {support['type']}: {support['value']} 元 (形成日期: {support['date']})\n"
-        
-        md_content += """
-
-## 阻力位分析
-"""
-        
-        for resistance in summary['resistance_levels']:
-            md_content += f"- {resistance['type']}: {resistance['value']} 元 (形成日期: {resistance['date']})\n"
-        
-        md_content += """
-
-## 持仓情况
-"""
-        
-        if summary['position']:
-            md_content += f"- 持仓数量: {summary['position']['shares']} 股\n"
-            md_content += f"- 平均成本: {summary['position']['average_price']} 元\n"
-            md_content += f"- 购买日期: {summary['position']['purchase_date']}\n"
-            md_content += f"- 浮动盈亏: {summary['position']['unrealized_pnl']} 元 ({summary['position']['unrealized_pnl_percent']}%)\n"
-        else:
-            md_content += "- 暂无持仓\n"
-        
-        md_content += """
-
-## 近期操作记录
-"""
-        
-        if summary['recent_operations']:
-            for op in summary['recent_operations']:
-                md_content += f"- {op['date']}: {op['type']} {op['shares']} 股 @ {op['price']} 元\n"
-        else:
-            md_content += "- 暂无近期操作\n"
-        
-        md_content += """
-
-## 技术指标数据
-"""
-        
-        for indicator, value in summary['technical_indicators'].items():
-            md_content += f"- {indicator}: {value}\n"
-        
-        if summary.get('realtime_info'):
-            md_content += """
-
-## 实时股票信息
-"""
-            realtime_info = summary['realtime_info']
-            for key, value in realtime_info.items():
-                md_content += f"- {key}: {value}\n"
-        
-        md_content += """
-
-## 报告信息
-"""
-        
-        md_content += f"- 财务报表分析报告: {'存在' if summary['analysis_reports'].get('financial_statements') else '无'}\n"
-        md_content += f"- 资金流分析报告: {'存在' if summary['analysis_reports'].get('fund_flow') else '无'}\n"
-        md_content += f"- 融资融券分析报告: {'存在' if summary['analysis_reports'].get('margin_data') else '无'}\n"
-        md_content += f"- 估值分析报告: {'存在' if summary['analysis_reports'].get('valuation') else '无'}\n"
-        md_content += f"- 技术趋势分析报告: {'存在' if summary['analysis_reports'].get('technical_trend') else '无'}\n"
-        
-        md_content += """
-
-## 完整提示词
-
-```
-{prompt}
-```
-"""
+        txt_content += "完整提示词\n"
+        txt_content += "=" * 80 + "\n"
+        txt_content += prompt + "\n"
         
         # 保存文件
         with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(md_content)
+            f.write(txt_content)
         
         print(f"提示词信息已保存为: {file_path}")
         return file_path
@@ -949,8 +817,6 @@ class StockAIComprehensiveAnalyzer:
     def run_analysis(self):
         """运行完整分析"""
         self.load_data()
-        self.calculate_support_resistance()
-        self.plot_support_resistance()
         self.load_analysis_reports()
         
         # 生成AI提示词
@@ -960,7 +826,7 @@ class StockAIComprehensiveAnalyzer:
         print(f"\n提示词长度: {len(prompt)} 字符")
         
         # 保存提示词信息
-        self.save_prompt_to_md(prompt)
+        self.save_prompt_to_txt(prompt)
         
         # 获取AI分析结果
         ai_analysis = self.get_ai_analysis(prompt)
@@ -974,7 +840,7 @@ class StockAIComprehensiveAnalyzer:
         # 提示用户如何使用
         print("\n=== 分析完成 ===")
         print("综合分析报告已保存为markdown文件，包含完整的股票分析和操作建议。")
-        print("提示词信息已保存为Markdown文件，包含提示词内容和数据信息。")
+        print("提示词信息已保存为TXT文件，包含提示词内容和数据信息。")
         
         return ai_analysis
 
@@ -983,14 +849,15 @@ if __name__ == "__main__":
     
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="使用本地Ollama AI进行股票综合分析")
-    parser.add_argument('--ticker', help="股票代码，例如：600519.SS（上交所）、000001.SZ（深交所），默认使用config.py中的第一个股票")
+    parser.add_argument('--ticker', help="股票代码，例如：600519.SS（上交所）、000001.SZ（深交所），默认分析config.py中的所有股票")
     args = parser.parse_args()
     
     # 从配置文件中获取股票代码
     from config import STOCK_TICKERS
     
-    # 确定股票代码
+    # 确定要分析的股票列表
     if args.ticker:
+        # 分析单个股票
         ticker = args.ticker
         # 查找对应的股票名称
         ticker_name = ticker
@@ -998,44 +865,26 @@ if __name__ == "__main__":
             if code == ticker:
                 ticker_name = name
                 break
+        stock_list = [(ticker_name, ticker)]
     else:
-        # 使用第一个股票代码进行分析
-        ticker_name, ticker = next(iter(STOCK_TICKERS.items()))
-        print(f"使用配置文件中的股票代码: {ticker} ({ticker_name})")
+        # 分析所有股票
+        stock_list = list(STOCK_TICKERS.items())
+        print(f"分析配置文件中的所有股票，共{len(stock_list)}只")
     
-    file_path = f'{DATA_DIR}/{ticker}/{ticker}_indicators.csv'
-    print(f"分析股票: {ticker} ({ticker_name})")
-    
-    # 分析数据
-    analyzer = StockAIComprehensiveAnalyzer(file_path)
-    
-    # 先加载数据
-    analyzer.load_data()
-    
-    # 从交易记录计算持仓情况
-    if ticker in TRADING_RECORDS:
-        position = analyzer.calculate_position_from_trading_records(TRADING_RECORDS[ticker])
-        analyzer.set_position(
-            position['shares'],
-            position['average_price'],
-            position['purchase_date']
-        )
-        print(f"从交易记录计算的持仓情况: {position['shares']}股，平均成本: {position['average_price']}元")
-    else:
-        print("配置文件中没有找到该股票的交易记录，无法计算持仓情况")
-    
-    # 从配置文件中获取交易记录
-    if ticker in TRADING_RECORDS:
-        for operation in TRADING_RECORDS[ticker]:
-            analyzer.add_operation(
-                operation['date'],
-                operation['type'],
-                operation['price'],
-                operation['shares']
-            )
-        print(f"使用配置文件中的交易记录，共{len(TRADING_RECORDS[ticker])}条")
-    else:
-        print("配置文件中没有找到该股票的交易记录")
-    
-    # 运行分析
-    analyzer.run_analysis()
+    # 遍历分析每只股票
+    for ticker_name, ticker in stock_list:
+        print(f"\n=====================================")
+        print(f"分析股票: {ticker} ({ticker_name})")
+        print("=====================================")
+        
+        file_path = f'{DATA_DIR}/{ticker}/{ticker}_indicators.csv'
+        
+        # 分析数据
+        analyzer = StockAIComprehensiveAnalyzer(file_path)
+        
+        # 运行完整分析
+        analyzer.run_analysis()
+        
+        # 等待2秒，避免请求过于频繁
+        import time
+        time.sleep(2)
