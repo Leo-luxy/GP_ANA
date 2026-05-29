@@ -132,6 +132,19 @@ data/
 # Configuration files
 config.py
 
+# Test files
+test/
+
+# Log files
+log/
+
+# Backup files
+backup/
+*.zip
+
+# macOS
+.DS_Store
+
 # Temporary files
 *.tmp
 *.temp
