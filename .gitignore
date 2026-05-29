@@ -131,6 +131,7 @@ data/
 
 # Configuration files
 config.py
+trading_records.py
 
 # Test files
 test/
