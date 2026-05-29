@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # batch_analysis.py
 # 功能：批量对多只股票执行完整的分析流程
 # 实现原理：
@@ -72,8 +72,16 @@ def main():
         print("\n6. 执行 ai_model.py")
         run_command(f"python daily/ai_model.py --ticker {stock_code}")
         
-        # 7. 股价预测
-        print("\n7. 执行 stock_prediction.py")
+        # 7. 趋势通道分析
+        print("\n7. 执行 trend_channel_analyzer.py")
+        run_command(f"python daily/trend_channel_analyzer.py --ticker {stock_code}")
+        
+        # 8. 资金驱动波动率突破策略分析
+        print("\n8. 执行 stock_quantitative_analyzer.py")
+        run_command(f"python daily/stock_quantitative_analyzer.py --tickers {stock_code} --backtest")
+        
+        # 9. 股价预测
+        print("\n9. 执行 stock_prediction.py")
         run_command(f"python daily/stock_prediction.py --ticker {stock_code}")
         
         print(f"\n=====================================")
@@ -117,8 +125,16 @@ def main():
             print("\n6. 执行 ai_model.py")
             run_command(f"python daily/ai_model.py --ticker {stock_code}")
             
-            # 7. 股价预测
-            print("\n7. 执行 stock_prediction.py")
+            # 7. 趋势通道分析
+            print("\n7. 执行 trend_channel_analyzer.py")
+            run_command(f"python daily/trend_channel_analyzer.py --ticker {stock_code}")
+            
+            # 8. 资金驱动波动率突破策略分析
+            print("\n8. 执行 stock_quantitative_analyzer.py")
+            run_command(f"python daily/stock_quantitative_analyzer.py --tickers {stock_code} --backtest")
+            
+            # 9. 股价预测
+            print("\n9. 执行 stock_prediction.py")
             run_command(f"python daily/stock_prediction.py --ticker {stock_code}")
             
             print(f"\n=====================================")

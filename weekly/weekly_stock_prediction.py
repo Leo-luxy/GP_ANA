@@ -69,7 +69,7 @@ class WeeklyStockPredictor:
                          'MA5', 'MA10', 'MA20', 'MA50', 'MA60',
                          'VOL5', 'VOL10', 'Volume_Ratio',
                          'K', 'D', 'J',
-                         'MACD', 'MACD_signal', 'MACD_hist',
+                         'DIF', 'DEA', 'MACD_hist',
                          'BB_upper', 'BB_middle', 'BB_lower',
                          'ATR', 'RSI_6', 'CCI', 'ROC', 'OBV',
                          'VWAP', 'Volatility', 'BIAS5', 'BIAS10', 'WR', 'DMA']
@@ -167,7 +167,7 @@ class WeeklyStockPredictor:
                              'MA5', 'MA10', 'MA20', 'MA50', 'MA60',
                              'VOL5', 'VOL10', 'Volume_Ratio',
                              'K', 'D', 'J',
-                             'MACD', 'MACD_signal', 'MACD_hist',
+                             'DIF', 'DEA', 'MACD_hist',
                              'BB_upper', 'BB_middle', 'BB_lower',
                              'ATR', 'RSI_6', 'CCI', 'ROC', 'OBV',
                              'VWAP', 'Volatility', 'BIAS5', 'BIAS10', 'WR', 'DMA']
@@ -241,7 +241,7 @@ class WeeklyStockPredictor:
             signals['RSI'] = '正常区间'
         
         # MACD信号
-        if latest['MACD'] > latest['MACD_signal']:
+        if latest['DIF'] > latest['DEA']:
             signals['MACD'] = '金叉，看涨'
         else:
             signals['MACD'] = '死叉，看跌'

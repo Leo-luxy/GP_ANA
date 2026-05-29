@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # analyze_technical_trend.py
 # 功能：分析股票技术指标趋势，提供详细的趋势描述
 # 实现原理：
@@ -75,8 +75,8 @@ class StockTechnicalTrendAnalyzer:
             'MA10': round(latest.get('MA10', 0), 2),
             'MA20': round(latest.get('MA20', 0), 2),
             'RSI': round(latest.get('RSI', 0), 2),
-            'MACD': round(latest.get('MACD', 0), 4),
-            'MACD_signal': round(latest.get('MACD_signal', 0), 4),
+            'DIF': round(latest.get('DIF', 0), 4),
+            'DEA': round(latest.get('DEA', 0), 4),
             'KDJ_K': round(latest.get('K', 0), 2),
             'KDJ_D': round(latest.get('D', 0), 2),
             'KDJ_J': round(latest.get('J', 0), 2),
@@ -97,20 +97,23 @@ class StockTechnicalTrendAnalyzer:
     
     def analyze_macd_trend(self):
         """分析MACD趋势"""
-        if 'MACD' not in self.recent_data.columns or 'MACD_signal' not in self.recent_data.columns:
+        if 'DIF' not in self.recent_data.columns or 'DEA' not in self.recent_data.columns:
             self.indicator_trends['MACD'] = "数据不足，无法分析趋势"
             return
         
-        # 计算MACD柱状图
-        macd = self.recent_data['MACD'].values
-        macd_signal = self.recent_data['MACD_signal'].values
-        macd_hist = macd - macd_signal
+        # 直接使用已有的MACD柱状图
+        dif = self.recent_data['DIF'].values
+        dea = self.recent_data['DEA'].values
+        if 'MACD_hist' in self.recent_data.columns:
+            macd_hist = self.recent_data['MACD_hist'].values
+        else:
+            macd_hist = dif - dea
         
         # 分析趋势
-        latest_macd = macd[-1]
+        latest_dif = dif[-1]
         latest_macd_hist = macd_hist[-1]
         
-        trend_description = f"最新值: {latest_macd:.4f}"
+        trend_description = f"最新值: {latest_macd_hist:.4f}"
         
         # 分析柱状图趋势
         if len(macd_hist) >= 10:

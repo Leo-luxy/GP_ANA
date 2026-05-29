@@ -124,7 +124,8 @@ def check_stock_data(ticker):
         'fund_flow': os.path.join(stock_dir, f"{ticker}_fund_flow.csv"),
         'margin_data': os.path.join(stock_dir, f"{ticker}_margin_data.csv"),
         'valuation': os.path.join(stock_dir, f"{ticker}_valuation.csv"),
-        'indicators': os.path.join(stock_dir, f"{ticker}_indicators.csv")
+        'indicators': os.path.join(stock_dir, f"{ticker}_indicators.csv"),
+        'shareholder_num': os.path.join(stock_dir, f"{ticker}_shareholder_num.csv")
     }
     
     # 检查qfq.csv
@@ -171,6 +172,15 @@ def check_stock_data(ticker):
         run_command(cmd)
     else:
         print("indicators.csv 是最新的")
+    
+    # 检查shareholder_num.csv
+    if not check_file_up_to_date(files_to_check['shareholder_num'], current_date):
+        print("shareholder_num.csv 不是最新或缺失，需要更新")
+        # 调用shareholder_num_collector.py获取数据
+        cmd = f"python shareholder_num_collector.py --ticker {ticker}"
+        run_command(cmd)
+    else:
+        print("shareholder_num.csv 是最新的")
 
 def main():
     """主函数"""

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # stock_market_data_collector.py
 # 功能：专门获取股票的估值、资金流和融资融券数据
 # 实现原理：

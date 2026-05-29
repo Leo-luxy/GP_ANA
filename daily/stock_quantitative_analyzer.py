@@ -98,23 +98,24 @@ def calculate_rps(data_df, period=120):
 def calculate_macd_analysis(data_df):
     """计算MACD相关分析"""
     # 确保MACD已经计算
-    if 'MACD' not in data_df.columns or 'MACD_signal' not in data_df.columns:
+    if 'DIF' not in data_df.columns or 'DEA' not in data_df.columns:
         # 计算MACD
         exp1 = data_df['close'].ewm(span=12, adjust=False).mean()
         exp2 = data_df['close'].ewm(span=26, adjust=False).mean()
-        data_df['MACD'] = exp1 - exp2
-        data_df['MACD_signal'] = data_df['MACD'].ewm(span=9, adjust=False).mean()
+        data_df['DIF'] = exp1 - exp2
+        data_df['DEA'] = data_df['DIF'].ewm(span=9, adjust=False).mean()
     
-    # 计算MACD柱状图
-    data_df['MACD_hist'] = data_df['MACD'] - data_df['MACD_signal']
+    # 确保MACD柱状图存在
+    if 'MACD_hist' not in data_df.columns:
+        data_df['MACD_hist'] = data_df['DIF'] - data_df['DEA']
     
     # MACD金叉死叉
     data_df['MACD_crossover'] = 0
-    data_df.loc[data_df['MACD'] > data_df['MACD_signal'], 'MACD_crossover'] = 1
-    data_df.loc[data_df['MACD'] < data_df['MACD_signal'], 'MACD_crossover'] = -1
+    data_df.loc[data_df['DIF'] > data_df['DEA'], 'MACD_crossover'] = 1
+    data_df.loc[data_df['DIF'] < data_df['DEA'], 'MACD_crossover'] = -1
     
     # MACD趋势
-    data_df['MACD_trend'] = data_df['MACD'].diff()
+    data_df['MACD_trend'] = data_df['DIF'].diff()
     
     return data_df
 
@@ -292,8 +293,8 @@ def analyze_stock(ticker, input_dir=None, backtest=False):
         'OBV_new_high': latest_data['OBV_new_high'],
         'KC_upper': latest_data['KC_upper'],
         'ATR_expanding': latest_data['ATR_expanding'],
-        'MACD': latest_data['MACD'],
-        'MACD_signal': latest_data['MACD_signal'],
+        'DIF': latest_data['DIF'],
+        'DEA': latest_data['DEA'],
         'MACD_hist': latest_data['MACD_hist'],
         'MACD_crossover': latest_data['MACD_crossover'],
         '30d_volatility': latest_data['30d_volatility'],
@@ -626,7 +627,7 @@ def plot_stock_analysis(df, buy_signals, sell_signals, ticker, output_dir=None, 
     """绘制单只股票的分析结果，显示买入点和卖出点"""
     # 确定输出目录
     if output_dir:
-        base_dir = os.path.join(output_dir, ticker)
+        base_dir = os.path.join(output_dir, ticker, 'analysis')
     else:
         base_dir = os.path.join(DATA_DIR, ticker, 'analysis')
     
@@ -861,7 +862,7 @@ def save_stock_analysis(ticker, df, analysis_result, output_dir=None):
     """保存单只股票的分析结果"""
     # 确定输出目录
     if output_dir:
-        base_dir = os.path.join(output_dir, ticker)
+        base_dir = os.path.join(output_dir, ticker, 'analysis')
     else:
         base_dir = os.path.join(DATA_DIR, ticker, 'analysis')
     
@@ -953,7 +954,7 @@ def save_analysis_results(results, output_dir=None):
     """保存分析结果"""
     # 确定输出目录
     if output_dir:
-        base_dir = output_dir
+        base_dir = os.path.join(output_dir, 'analysis')
     else:
         base_dir = os.path.join(DATA_DIR, 'analysis')
     

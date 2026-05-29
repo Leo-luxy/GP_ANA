@@ -1,266 +1,175 @@
-# GP_ANA
+# 股票分析系统
 
-GP_ANA 是一款全流程量化投资与 AI 分析系统。支持 akshare/yfinance 数据抓取、TA-Lib 指标计算、策略回测优化及可视化。核心集成机器学习与本地 Ollama AI 分析，支持多股票批量处理与自动化任务调度。是量化研究与 AI 辅助决策的理想实践平台。
+本系统用于股票数据的抓取、分析和策略回测，提供完整的股票分析流程。
 
-## 新增功能亮点
+## 🌐 快速开始 - Web 界面使用（推荐）
 
-### API功能
-- **外部大模型API支持**：可配置使用OpenAI等符合OpenAI API格式的大模型服务
-- **本地Ollama回退**：当外部API不可用时，自动回退到本地Ollama服务进行分析
-- **多数据源融合**：从新浪财经、东方财富等多个权威金融数据源获取公司信息和财报数据
+**最简单的方式：使用 Web 界面，一站式完成所有操作！**
 
-### 自动化特性
-- **定时任务管理**：使用schedule库设置定时任务，定期执行数据更新和策略运行
-- **完整的自动化流程**：从数据抓取、分析到策略回测的全流程自动化
-- **日志记录**：详细的自动化系统日志，便于问题排查和性能监控
+### 启动 Web 界面
 
-## 执行顺序
+```bash
+python web_ui.py
+```
+
+启动后访问：**http://localhost:8081**
+
+### Web 界面功能
+
+✅ **股票分析** - 支持三种分析模式：
+- 🆕 新股票初始化（完整分析流程）
+- 📅 每日更新（日线数据更新）
+- 🔄 定期更新（财务数据等低频数据）
+
+✅ **买卖记录管理** - 添加和查看股票交易记录
+
+✅ **详细模式** - 精细化控制数据抓取和分析
+
+✅ **报告查看** - 浏览所有股票的分析报告
+
+### 使用流程
+
+1. **启动 Web 界面**
+   ```bash
+   python web_ui.py
+   ```
+
+2. **打开浏览器访问** http://localhost:8081
+
+3. **输入股票代码**（6 位数字，如：300433）
+
+4. **选择分析类型**
+   - 新股票：选择"新股票初始化"
+   - 已有股票：选择"每日更新"
+
+5. **点击"开始分析"**，系统自动执行：
+   - 数据抓取（公司基本信息、财务数据、北向资金等）
+   - 数据分析（财务报表、资金流、融资融券等）
+   - AI 综合分析
+
+6. **查看分析报告** - 分析完成后自动显示最新报告
+
+### 前置要求
+
+- ✅ 已安装所有依赖：`pip install -r requirements.txt`
+- ✅ Flask 已安装（Web 界面依赖）
+- ✅ Ollama 服务运行中（用于 AI 分析，可选）
+
+---
+
+## 程序分类
+
+### 1. 数据抓取类
+
+| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
+|---------|------|-----------|--------|----------|
+| `data_collector.py` | 抓取股票历史行情数据（前复权） | akshare | `{ticker}_qfq.csv` | `python data_collector.py [--ticker 300433.SZ]` |
+| `stock_market_data_collector.py` | 股票市场数据抓取，包括资金流、融资融券和估值数据 | akshare | `{ticker}_fund_flow.csv`<br>`{ticker}_margin_data.csv`<br>`{ticker}_valuation.csv` | `python stock_market_data_collector.py [--ticker 300433.SZ]` |
+| `stock_company_info_collector.py` | 获取股票公司的基本信息、研究报告、主要股东等信息 | akshare | `{ticker}_company_basic.json`<br>`{ticker}_research_reports.csv`<br>`{ticker}_main_shareholders.csv`<br>`{ticker}_financial_profit.csv`<br>`{ticker}_financial_balance.csv`<br>`{ticker}_north_holdings.csv` | `python stock_company_info_collector.py [--ticker 300433.SZ]` |
+| `financial_indicators_collector.py` | 获取股票的财务指标、成长指标、现金流指标等数据 | akshare | `{ticker}_financial_indicators.json` | `python financial_indicators_collector.py [--ticker 300433.SZ]` |
+| `shareholder_collector.py` | 抓取机构持股数据 | 东方财富API | `{ticker}_shareholder.csv` | `python shareholder_collector.py [--ticker 300433.SZ]` |
+| `shareholder_num_collector.py` | 抓取股东户数、户均持股等历史数据 | 东方财富API | `{ticker}_shareholder_num.csv` | `python shareholder_num_collector.py [--ticker 300433.SZ]` |
+| `north_holdings.py` | 获取北向资金持股数据 | 东方财富API | `{ticker}_north_holdings.csv` | `python north_holdings.py [--ticker 300433.SZ]` |
+| `north_fund_collector.py` | 抓取北向资金逐日持股数据 | 东方财富API | `{ticker}_north_fund.csv` | `python north_fund_collector.py` |
+| `em_financial_collector.py` | 抓取东方财富财务数据 | 东方财富API | `{ticker}_dupont_data.csv`<br>`{ticker}_growth_ratio_data.csv` | `python em_financial_collector.py [--ticker 300433.SZ]` |
+| `important_missing_data_collector.py` | 抓取重要缺失数据 | 多个数据源 | 各种缺失数据文件 | `python important_missing_data_collector.py [--ticker 300433.SZ]` |
+| `db_collector.py` | 数据库数据收集 | 数据库 | 数据库数据文件 | `python db_collector.py` |
+
+### 2. 数据分析类
+
+| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
+|---------|------|-----------|--------|----------|
+| `analyze_financial_statements.py` | 财务报表分析 | `{ticker}_company_basic.json`<br>`{ticker}_financial_profit.csv`<br>`{ticker}_financial_balance.csv`<br>`{ticker}_financial_indicators.json` | `./data/{ticker}/{ticker}_financial_analysis_{timestamp}.md` | `python analyze_financial_statements.py --ticker 300433.SZ` |
+| `analyze_fund_flow.py` | 资金流分析 | `{ticker}_fund_flow.csv` | `./data/{ticker}/{ticker}_fund_flow_analysis_{timestamp}.md` | `python analyze_fund_flow.py --ticker 300433.SZ` |
+| `analyze_margin_data.py` | 融资融券分析 | `{ticker}_margin_data.csv` | `./data/{ticker}/{ticker}_margin_data_analysis_{timestamp}.md` | `python analyze_margin_data.py --ticker 300433.SZ` |
+| `analyze_research_reports.py` | 研究报告分析 | `{ticker}_company_basic.json`<br>`{ticker}_research_reports.csv` | `./data/{ticker}/{ticker}_research_reports_analysis_{timestamp}.md` | `python analyze_research_reports.py --ticker 300433.SZ` |
+| `analyze_shareholder_structure.py` | 股东结构分析 | `{ticker}_company_basic.json`<br>`{ticker}_main_shareholders.csv`<br>`{ticker}_shareholder.csv`<br>`{ticker}_shareholder_num.csv`<br>`{ticker}_north_fund.csv` | `./data/{ticker}/{ticker}_shareholder_structure_analysis_{timestamp}.md` | `python analyze_shareholder_structure.py --ticker 300433.SZ` |
+| `analyze_valuation_data.py` | 估值分析 | `{ticker}_valuation.csv` | `./data/{ticker}/{ticker}_valuation_analysis_{timestamp}.md` | `python analyze_valuation_data.py --ticker 300433.SZ` |
+| `analyze_technical_trend.py` | 技术趋势分析 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_technical_trend_analysis.json` | `python analyze_technical_trend.py [--ticker 300433.SZ]` |
+| `analyze_em_financial.py` | 东方财富财务分析 | 东方财富数据文件 | 财务分析报告 | `python analyze_em_financial.py --ticker 300433.SZ` |
+| `analyze_performance_forecast.py` | 业绩预测分析 | 业绩预测数据文件 | 业绩预测分析报告 | `python analyze_performance_forecast.py --ticker 300433.SZ` |
+| `daily/data_analysis.py` | 股票数据质量检查和可视化分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_price_volume.png`<br>`./data/{ticker}/{ticker}_technical_indicators.png`<br>`./data/{ticker}/{ticker}_bollinger_bands.png`<br>`./data/{ticker}/{ticker}_correlation.png` | `python daily/data_analysis.py [--ticker 300433.SZ]` |
+| `daily/technical_analysis.py` | 技术指标信号分析和有效性评估 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_signal_analysis.png` | `python daily/technical_analysis.py [--ticker 300433.SZ]` |
+| `daily/quantitative_strategy.py` | 基于技术指标的量化交易策略回测 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_strategy_results.png`<br>`./data/{ticker}/{ticker}_trading_signals.csv` | `python daily/quantitative_strategy.py [--ticker 300433.SZ]` |
+| `daily/strategy_optimization.py` | 优化量化交易策略的参数 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_optimization_results.png` | `python daily/strategy_optimization.py [--ticker 300433.SZ]` |
+| `daily/daily_strategy_optimization_multistock.py` | 多股票策略优化 | 多个股票的指标数据 | 多股票优化结果文件 | `python daily/daily_strategy_optimization_multistock.py` |
+| `daily/stock_quantitative_analyzer.py` | 股票量化分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_analysis_{date}.csv`<br>`./data/{ticker}/{ticker}_analysis_{date}.png` | `python daily/stock_quantitative_analyzer.py [--ticker 300433.SZ]` |
+| `daily/trend_channel_analyzer.py` | 趋势通道分析 | `{ticker}_qfq.csv` | `./data/{ticker}/{ticker}_trend_channel_results.png`<br>`./data/{ticker}/{ticker}_trend_channel_signals.csv` | `python daily/trend_channel_analyzer.py [--ticker 300433.SZ]` |
+| `weekly/weekly_data_analysis.py` | 周线数据质量检查和可视化分析 | 周线数据文件 | 周线分析图表 | `python weekly/weekly_data_analysis.py` |
+| `weekly/weekly_quantitative_strategy.py` | 基于周线的量化交易策略回测 | 周线数据文件 | 周线策略回测结果 | `python weekly/weekly_quantitative_strategy.py` |
+| `weekly/weekly_strategy_optimization.py` | 周线策略参数优化 | 周线数据文件 | 周线策略优化结果 | `python weekly/weekly_strategy_optimization.py` |
+| `weekly/weekly_strategy_optimization_multistock.py` | 多股票周线策略优化 | 多个股票的周线数据 | 多股票周线优化结果 | `python weekly/weekly_strategy_optimization_multistock.py` |
+| `weekly/weekly_stock_analyzer.py` | 周线综合分析 | 周线数据文件 | 周线分析报告 | `python weekly/weekly_stock_analyzer.py` |
+| `daily_trend_strategy.py` | 日线趋势策略分析 | 日线数据文件 | 趋势策略分析结果 | `python daily_trend_strategy.py` |
+
+### 3. AI分析类
+
+| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
+|---------|------|-----------|--------|----------|
+| `daily/ai_model.py` | 使用机器学习模型对股票价格进行预测和分析 | `{ticker}_indicators.csv` | `{ticker}_ai_predictions.png`<br>`{ticker}_feature_importance.png` | `python daily/ai_model.py [--ticker 300433.SZ]` |
+| `daily/stock_prediction.py` | 股票价格预测 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | 预测结果图表和数据文件 | `python daily/stock_prediction.py` |
+| `weekly/weekly_stock_prediction.py` | 周线价格预测 | 周线数据文件 | 周线预测结果 | `python weekly/weekly_stock_prediction.py` |
+
+### 4. LLM分析类
+
+| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
+|---------|------|-----------|--------|----------|
+| `stock_ai_comprehensive_analyzer.py` | 综合股票的财务报表、资金流、融资融券和估值分析报告，发送给本地Ollama AI进行综合分析 | 各种分析报告文件 | `{ticker}_comprehensive_analysis_{timestamp}.md`<br>`{ticker}_prompt_info_{timestamp}.md` | `python stock_ai_comprehensive_analyzer.py [--ticker 300433.SZ]` |
+| `daily/stock_ai_local_analyzer.py` | 将股票数据发送给本地Ollama AI进行分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `{ticker}_{timestamp}.md`<br>`{ticker}_support_resistance.png` | `python daily/stock_ai_local_analyzer.py [--ticker 300433.SZ]` |
+| `weekly/weekly_stock_ai_local_analyzer.py` | 周线AI分析 | 周线数据文件 | 周线AI分析报告 | `python weekly/weekly_stock_ai_local_analyzer.py` |
+
+### 5. 工具和自动化类
+
+| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
+|---------|------|-----------|--------|----------|
+| `check_data_updates.py` | 检查指定股票的数据文件是否是最新日期以及是否有数据文件缺失 | 数据文件 | 无（自动更新数据文件） | `python check_data_updates.py [--ticker 300433.SZ]` |
+| `check_periodic_data_updates.py` | 检查定期数据更新 | 定期数据文件 | 无（自动更新数据文件） | `python check_periodic_data_updates.py [--ticker 300433.SZ]` |
+| `batch_analyze_all.py` | 批量对多只股票执行完整的分析流程 | 所有分析脚本 | 各股票的分析结果文件 | `python batch_analyze_all.py [--ticker 300433.SZ]` |
+| `batch_analyze_daily.py` | 批量执行日线分析 | 日线分析脚本 | 各股票的日线分析结果 | `python batch_analyze_daily.py [--ticker 300433.SZ]` |
+| `batch_analyze_periodic.py` | 批量执行定期数据分析 | 定期分析脚本 | 各股票的定期分析结果 | `python batch_analyze_periodic.py [--ticker 300433.SZ]` |
+| `separate_company_info.py` | 将公司信息分离为多个文件 | `{ticker}_company_info.json` | 分离后的多个文件 | `python separate_company_info.py [--ticker 300433.SZ]` |
+| `manage_logs.py` | 日志管理 | 日志文件 | 管理后的日志文件 | `python manage_logs.py` |
+| `trading_records.py` | 交易记录管理 | 交易记录文件 | 管理后的交易记录 | `python trading_records.py` |
+| `utils.py` | 通用工具函数，包含技术指标计算 | 无 | 无 | 被其他脚本引用 |
+| `web_ui.py` | Web界面 | 各种数据文件 | Web界面 | `python web_ui.py` |
+| `api/analysis.py` | 分析API | 分析结果文件 | API响应 | 被Web界面调用 |
+| `api/detailed.py` | 详细信息API | 各种数据文件 | API响应 | 被Web界面调用 |
+| `api/report_viewer.py` | 报告查看API | 分析报告文件 | API响应 | 被Web界面调用 |
+| `api/trading.py` | 交易API | 交易记录文件 | API响应 | 被Web界面调用 |
+| `report_viewer.py` | 报告查看器 | 分析报告文件 | 报告查看界面 | `python report_viewer.py` |
+
+### 6. 配置文件
+
+| 文件名 | 功能 | 内容 |
+|-------|------|------|
+| `config.py` | 存储系统配置参数 | 股票代码、持仓情况、交易记录、历史数据日期范围、技术指标参数等 |
+| `requirements.txt` | 依赖项列表 | 系统所需的Python包 |
+
+## 执行流程
 
 1. **数据抓取**
-   - `stock_history_collector_ta_v2.py` - 抓取历史数据并计算技术指标
-   - `stock_data_collector_ta.py` - 抓取最新交易日数据并计算技术指标
+   - 运行数据抓取类程序获取股票数据
+   - 优先运行 `stock_company_info_collector.py` 获取公司基本信息
+   - 然后运行 `data_collector.py` 和 `stock_market_data_collector.py` 获取市场数据
+   - 最后运行其他数据抓取程序获取补充数据
 
-2. **数据基础分析**
-   - `daily/data_analysis.py` - 数据质量检查和可视化分析
-   - `daily/technical_analysis.py` - 技术指标信号分析
+2. **数据处理**
+   - 运行 `separate_company_info.py` 分离公司信息（如果需要）
+   - 运行 `check_data_updates.py` 检查数据更新情况
 
-3. **策略分析**
-   - `daily/quantitative_strategy.py` - 量化策略回测
-   - `daily/strategy_optimization.py` - 策略参数优化
+3. **数据分析**
+   - 运行数据分析类程序进行各种分析
+   - 可以使用 `batch_analyze_daily.py` 批量执行日线分析
+   - 使用 `batch_analyze_periodic.py` 批量执行定期数据分析
 
 4. **AI分析**
-   - `daily/ai_model.py` - 机器学习模型预测
-   - `stock_ai_local_analyzer.py` - 本地AI分析
+   - 运行AI分析类程序进行机器学习预测
+   - 运行LLM分析类程序获取AI分析报告
+   - 使用 `stock_ai_comprehensive_analyzer.py` 获取综合分析报告
 
-5. **自动化**
-   - `automation_system.py` - 自动化数据更新和策略运行
-
-## 文件功能说明
-
-### 1. 配置文件
-- **config.py**
-  - 功能：存储系统配置参数
-  - 内容：股票代码、持仓情况、交易记录、历史数据日期范围、技术指标参数、AI模型配置等
-  - 产出物：无
-  - 注意：config.py包含私人信息，已被添加到.gitignore中，请复制config.example.py为config.py并填写实际配置
-
-### 2. 数据抓取
-- **stock_history_collector_ta_v2.py**
-  - 功能：抓取指定时间段的股票历史数据并使用TA-Lib计算技术指标
-  - 实现原理：优先使用akshare获取国内股票数据，失败后使用yfinance作为备选
-  - 产出物：`./data/{ticker}/{ticker}_history.csv` - 包含价格和技术指标的历史数据
-  - 调用方法：`python stock_history_collector_ta_v2.py 300433.SZ`
-    - 可选参数：
-      - `--start_date`：开始日期，格式：YYYYMMDD
-      - `--end_date`：结束日期，格式：YYYYMMDD
-      - `--filename`：保存数据的文件名
-      - `--output-dir`：保存数据的目录
-
-- **stock_data_collector_ta.py**
-  - 功能：抓取最新交易日的股票数据并计算技术指标
-  - 实现原理：使用akshare获取最新交易数据，计算技术指标并保存
-  - 产出物：更新 `./data/{ticker}/{ticker}_history.csv` 文件，添加最新交易日数据
-  - 调用方法：`python stock_data_collector_ta.py`
-
-- **stock_history_collector.py**
-  - 功能：抓取股票历史数据
-  - 实现原理：使用akshare或yfinance获取历史数据
-  - 产出物：`./data/{ticker}/{ticker}_history.csv` - 历史数据文件
-
-- **stock_data_collector.py**
-  - 功能：抓取最新股票数据
-  - 实现原理：使用akshare获取最新交易数据
-  - 产出物：更新 `./data/{ticker}/{ticker}_history.csv` 文件
-
-### 3. 数据基础分析 (日线)
-- **daily/data_analysis.py**
-  - 功能：股票数据质量检查和可视化分析
-  - 实现原理：加载数据，检查数据质量，绘制价格、成交量和技术指标图表
-  - 产出物：
-    - `./data/{ticker}/{ticker}_price_volume.png` - 价格和成交量图表
-    - `./data/{ticker}/{ticker}_technical_indicators.png` - 技术指标图表
-    - `./data/{ticker}/{ticker}_bollinger_bands.png` - 布林带图表
-    - `./data/{ticker}/{ticker}_correlation.png` - 技术指标相关性热力图
-  - 调用方法：
-    - 默认分析第一只股票：`python daily/data_analysis.py`
-    - 指定股票分析：`python daily/data_analysis.py --ticker 300433.SZ`
-
-- **daily/technical_analysis.py**
-  - 功能：技术指标信号分析和有效性评估
-  - 实现原理：计算各种技术信号，评估信号有效性，绘制信号分析图表
-  - 产出物：`./data/{ticker}/{ticker}_signal_analysis.png` - 技术信号分析图表
-  - 调用方法：
-    - 默认分析第一只股票：`python daily/technical_analysis.py`
-    - 指定股票分析：`python daily/technical_analysis.py --ticker 300433.SZ`
-
-### 4. 策略分析 (日线)
-- **daily/quantitative_strategy.py**
-  - 功能：基于技术指标的量化交易策略回测
-  - 实现原理：计算交易信号，执行策略回测，计算性能指标
-  - 产出物：
-    - `./data/{ticker}/{ticker}_strategy_results.png` - 策略回测结果图表
-    - `./data/{ticker}/{ticker}_trading_signals.csv` - 交易信号数据文件
-  - 调用方法：
-    - 默认分析第一只股票：`python daily/quantitative_strategy.py`
-    - 指定股票分析：`python daily/quantitative_strategy.py --ticker 300433.SZ`
-
-- **daily/strategy_optimization.py**
-  - 功能：优化量化交易策略的参数，提高策略性能
-  - 实现原理：遍历不同参数组合，评估性能，选择最佳参数
-  - 产出物：`./data/{ticker}/{ticker}_optimization_results.png` - 优化结果图表
-  - 调用方法：
-    - 默认分析第一只股票：`python daily/strategy_optimization.py`
-    - 指定股票分析：`python daily/strategy_optimization.py --ticker 300433.SZ`
-
-- **daily/daily_strategy_optimization_multistock.py**
-  - 功能：多股票策略优化
-  - 实现原理：对多只股票执行策略优化，寻找最佳参数组合
-  - 产出物：多股票优化结果文件
-  - 调用方法：`python daily/daily_strategy_optimization_multistock.py`
-
-### 5. AI分析 (日线)
-- **daily/ai_model.py**
-  - 功能：使用机器学习模型对股票价格进行预测和分析
-  - 实现原理：加载数据，准备特征，训练模型，评估性能
-  - 产出物：
-    - `./data/{ticker}/{ticker}_ai_predictions.png` - 预测结果图表
-    - `./data/{ticker}/{ticker}_feature_importance.png` - 特征重要性图表
-  - 调用方法：
-    - 默认分析第一只股票：`python daily/ai_model.py`
-    - 指定股票分析：`python daily/ai_model.py --ticker 300433.SZ`
-
-- **stock_ai_local_analyzer.py**
-  - 功能：将股票数据发送给AI进行分析，支持外部大模型API和本地Ollama
-  - 实现原理：加载股票数据，生成AI提示词，优先使用外部API，失败后回退到本地Ollama
-  - 产出物：
-    - `./data/{ticker}/{ticker}_{timestamp}.md` - AI分析报告
-    - `./data/{ticker}/{ticker}_support_resistance.png` - 支撑阻力位分析图表
-  - 调用方法：
-    - 默认分析第一只股票：`python stock_ai_local_analyzer.py`
-    - 指定股票分析：`python stock_ai_local_analyzer.py --ticker 300433.SZ`
-  - 外部API配置：在config.py的AI_CONFIG中设置external_api参数
-
-- **daily/stock_ai_analyzer.py**
-  - 功能：整理股票支撑数据、持仓情况和操作情况，生成AI提示词
-  - 实现原理：计算支撑阻力位，整理持仓信息，生成提示词
-  - 产出物：无（生成的提示词可复制到网页AI服务）
-
-- **daily/stock_prediction.py**
-  - 功能：股票价格预测
-  - 实现原理：使用历史数据和技术指标预测未来价格走势
-  - 产出物：预测结果图表和数据文件
-  - 调用方法：`python daily/stock_prediction.py`
-
-### 6. 周线分析
-- **weekly/weekly_data_analysis.py**
-  - 功能：周线数据质量检查和可视化分析
-  - 实现原理：加载周线数据，检查数据质量，绘制图表
-  - 产出物：周线分析图表
-  - 调用方法：`python weekly/weekly_data_analysis.py`
-
-- **weekly/weekly_quantitative_strategy.py**
-  - 功能：基于周线的量化交易策略回测
-  - 实现原理：计算周线交易信号，执行策略回测
-  - 产出物：周线策略回测结果
-  - 调用方法：`python weekly/weekly_quantitative_strategy.py`
-
-- **weekly/weekly_strategy_optimization.py**
-  - 功能：周线策略参数优化
-  - 实现原理：遍历不同参数组合，评估周线策略性能
-  - 产出物：周线策略优化结果
-  - 调用方法：`python weekly/weekly_strategy_optimization.py`
-
-- **weekly/weekly_strategy_optimization_multistock.py**
-  - 功能：多股票周线策略优化
-  - 实现原理：对多只股票执行周线策略优化
-  - 产出物：多股票周线优化结果
-  - 调用方法：`python weekly/weekly_strategy_optimization_multistock.py`
-
-- **weekly/weekly_stock_analyzer.py**
-  - 功能：周线综合分析
-  - 实现原理：对股票周线数据进行综合分析
-  - 产出物：周线分析报告
-  - 调用方法：`python weekly/weekly_stock_analyzer.py`
-
-- **weekly/weekly_stock_ai_local_analyzer.py**
-  - 功能：周线AI分析，支持外部大模型API和本地Ollama
-  - 实现原理：将周线数据发送给AI进行分析，优先使用外部API，失败后回退到本地Ollama
-  - 产出物：周线AI分析报告
-  - 调用方法：`python weekly/weekly_stock_ai_local_analyzer.py`
-  - 外部API配置：在config.py的AI_CONFIG中设置external_api参数
-
-- **weekly/weekly_stock_prediction.py**
-  - 功能：周线价格预测
-  - 实现原理：使用周线数据预测未来价格走势
-  - 产出物：周线预测结果
-  - 调用方法：`python weekly/weekly_stock_prediction.py`
-
-- **weekly/weekly_batch_analysis.py**
-  - 功能：周线批量分析
-  - 实现原理：对多只股票执行周线分析
-  - 产出物：多股票周线分析结果
-  - 调用方法：`python weekly/weekly_batch_analysis.py`
-
-- **weekly/weekly_batch_analysis_complete.py**
-  - 功能：周线完整批量分析
-  - 实现原理：对多只股票执行完整的周线分析流程
-  - 产出物：多股票周线完整分析结果
-  - 调用方法：`python weekly/weekly_batch_analysis_complete.py`
-
-### 7. 工具和自动化
-- **utils.py**
-  - 功能：通用工具函数，包含技术指标计算
-  - 实现原理：尝试使用TA-Lib计算技术指标，失败后使用自定义实现
-  - 产出物：无
-
-- **automation_system.py**
-  - 功能：自动化股票数据更新、策略运行和性能监控
-  - 实现原理：使用schedule库设置定时任务，定期执行数据更新和策略运行
-  - 产出物：`automation.log` - 自动化系统日志
-
-- **stock_company_info_v2.py**
-  - 功能：从多个权威金融数据源获取公司基本信息和财报数据
-  - 实现原理：从新浪财经、东方财富等多个数据源获取信息并融合
-  - 产出物：
-    - `./data/{ticker}/{ticker}_{name}_company_info_v2.json` - 公司信息JSON文件
-    - `./data/{ticker}/{ticker}_{name}_company_info_v2.csv` - 公司信息CSV文件
-  - 调用方法：
-    - 默认分析第一只股票：`python stock_company_info_v2.py`
-    - 指定股票分析：`python stock_company_info_v2.py --ticker 300433.SZ`
-
-- **daily/batch_analysis.py**
-  - 功能：批量对多只股票执行完整的日线分析流程
-  - 实现原理：从config.py中读取所有股票代码，依次执行分析脚本
-  - 产出物：各股票的分析结果文件
-  - 调用方法：`python daily/batch_analysis.py`
-
-## 使用方法
-
-1. **配置股票信息**：在`config.py`中设置股票代码、持仓情况等参数
-2. **抓取历史数据**：运行`stock_history_collector_ta_v2.py`抓取股票历史数据
-3. **抓取最新数据**：运行`stock_data_collector_ta.py`抓取最新交易日数据
-4. **分析数据**：运行`daily/data_analysis.py`和`daily/technical_analysis.py`进行基础分析
-5. **回测策略**：运行`daily/quantitative_strategy.py`进行策略回测
-6. **优化策略**：运行`daily/strategy_optimization.py`优化策略参数
-7. **AI分析**：
-   - 运行`daily/ai_model.py`进行机器学习预测
-   - 运行`stock_ai_local_analyzer.py`获取AI分析报告
-     - 默认分析第一只股票：`python stock_ai_local_analyzer.py`
-     - 指定股票分析：`python stock_ai_local_analyzer.py --ticker 300433.SZ`
-   - **外部大模型API配置**：
-     - 在config.py的AI_CONFIG中设置external_api参数
-     - 示例配置：
-       ```python
-       'external_api': {
-           'enabled': True,  # 启用外部API
-           'api_key': 'your_api_key_here',  # 你的API密钥
-           'api_url': 'https://api.openai.com/v1/chat/completions',  # API地址（示例为OpenAI）
-           'model': 'gpt-4'  # 模型名称
-       }
-       ```
-     - 支持任何符合OpenAI API格式的大模型服务
-8. **周线分析**：运行weekly目录下的相应脚本进行周线分析
-9. **自动化运行**：运行`automation_system.py`设置定时任务
+5. **自动化运行**
+   - 可以设置定时任务自动执行数据抓取和分析
+   - 监控数据更新情况，确保数据及时更新
 
 ## 依赖项
 
@@ -275,7 +184,6 @@ GP_ANA 是一款全流程量化投资与 AI 分析系统。支持 akshare/yfinan
 - schedule
 - requests
 - pyperclip
-- APScheduler
 
 ## 注意事项
 
@@ -283,5 +191,13 @@ GP_ANA 是一款全流程量化投资与 AI 分析系统。支持 akshare/yfinan
 - 对于国内股票，优先使用akshare数据源
 - 技术指标计算需要TA-Lib库支持
 - 本地AI分析需要部署Ollama服务
-- 自动化系统需要保持运行状态以执行定时任务
 - 数据抓取脚本位于根目录，分析脚本分别位于daily和weekly目录
+- 所有数据抓取程序均采用增量保存方式，避免数据丢失
+- 数据文件存储在 `./data/{ticker}/` 目录下，按股票代码分类
+
+## 最新更新
+
+- 所有数据抓取程序已改为增量保存，确保数据的完整性和一致性
+- 公司信息已分离为多个专用文件，提高数据管理的清晰度和效率
+- 新增了多种分析脚本，提供更全面的股票分析功能
+- 优化了AI分析流程，提供更准确的分析报告

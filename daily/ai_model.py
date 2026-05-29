@@ -61,7 +61,7 @@ class AIPredictor:
                          'MA5', 'MA10', 'MA20', 'MA50', 'MA60',
                          'VOL5', 'VOL10', 'Volume_Ratio',
                          'K', 'D', 'J',
-                         'MACD', 'MACD_signal', 'MACD_hist',
+                         'DIF', 'DEA', 'MACD_hist',
                          'BB_upper', 'BB_middle', 'BB_lower',
                          'ATR', 'RSI', 'CCI', 'ROC', 'OBV',
                          'VWAP', 'Volatility', 'BIAS5', 'BIAS10', 'WR', 'DMA']
