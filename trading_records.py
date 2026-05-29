@@ -63,4 +63,12 @@ TRADING_RECORDS = {
     '603861.SH': [
         {'date': '2026-04-15', 'type': 'buy', 'price': 16.75, 'shares': 1000}
     ],
+    '600096.SH': [
+        {'date': '2026-04-14', 'type': 'buy', 'price': 33.29, 'shares': 200},
+        {'date': '2026-04-17', 'type': 'buy', 'price': 33.93, 'shares': 100},
+        {'date': '2026-04-30', 'type': 'buy', 'price': 36.34, 'shares': 200},
+        {'date': '2026-05-12', 'type': 'buy', 'price': 34.31, 'shares': 100},
+        {'date': '2026-05-14', 'type': 'buy', 'price': 32.48, 'shares': 100},
+        {'date': '2026-05-22', 'type': 'sell', 'price': 32.14, 'shares': 200}
+    ],
 }
