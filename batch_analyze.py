@@ -52,7 +52,7 @@ def get_all_steps(stock_code):
             ("融资融券分析", f"python analyze_margin_data.py --ticker {stock_code}"),
             ("估值分析", f"python analyze_valuation_data.py --ticker {stock_code}"),
             ("研究报告分析", f"python analyze_research_reports.py --ticker {stock_code}"),
-            # V3 Process 模块（JSON 摘要）
+            # v1.2 Process 模块（JSON 摘要）
             ("计算技术趋势数据", f"python calculate_technical_trend_ds.py --ticker {stock_code}"),
             ("生成财务结构化JSON", f"python Process/financial_structured_analyzer.py --ticker {stock_code}"),
             ("生成情绪估值JSON", f"python Process/sentiment_valuation_analyzer.py --ticker {stock_code}"),

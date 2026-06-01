@@ -1,148 +1,231 @@
-# 股票分析系统
+# GP_ANA — A 股 AI 综合分析系统
 
-本系统用于股票数据的抓取、分析和策略回测，提供完整的股票分析流程。
+> 🧠 基于本地 Ollama 大模型的 A 股智能分析平台：数据采集 → 多维分析 → 策略回测 → Web 可视化，完整闭环。
+
+**当前版本：v1.2.0**
+
+---
+
+## 🎯 核心能力
+
+| 能力 | 说明 |
+|------|------|
+| 📡 **数据采集** | 20+ 数据采集器，覆盖行情、财务、资金流、融资融券、股东、行业等 |
+| 📊 **多维分析** | 财务、资金流、融资融券、估值、技术趋势、股东结构、同行对比、研报观点 |
+| 🧠 **AI 决策** | 五维度 JSON 摘要 + 两层决策（冲突检测 → 交易计划），支持 3 种策略模式 |
+| 📈 **策略回测** | 趋势跟踪回测，含信号去重、实际执行追踪 |
+| 🌐 **Web 界面** | Flask Web UI（localhost:8081），完整分析 / 快速分析 / 回测 / 交易记录管理 |
+| 🔧 **统一入口** | `eastmoney_fetcher.py` 统一数据抓取，`batch_analyze.py --mode` 统一批量分析 |
+
+---
 
 ## 程序分类
 
 ### 1. 数据抓取类
 
-| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
-|---------|------|-----------|--------|----------|
-| `data_collector.py` | 抓取股票历史行情数据（前复权） | akshare | `{ticker}_qfq.csv` | `python data_collector.py [--ticker 300433.SZ]` |
-| `stock_market_data_collector.py` | 股票市场数据抓取，包括资金流、融资融券和估值数据 | akshare | `{ticker}_fund_flow.csv`<br>`{ticker}_margin_data.csv`<br>`{ticker}_valuation.csv` | `python stock_market_data_collector.py [--ticker 300433.SZ]` |
-| `stock_company_info_collector.py` | 获取股票公司的基本信息、研究报告、主要股东等信息 | akshare | `{ticker}_company_basic.json`<br>`{ticker}_research_reports.csv`<br>`{ticker}_main_shareholders.csv`<br>`{ticker}_financial_profit.csv`<br>`{ticker}_financial_balance.csv`<br>`{ticker}_north_holdings.csv` | `python stock_company_info_collector.py [--ticker 300433.SZ]` |
-| `financial_indicators_collector.py` | 获取股票的财务指标、成长指标、现金流指标等数据 | akshare | `{ticker}_financial_indicators.json` | `python financial_indicators_collector.py [--ticker 300433.SZ]` |
-| `shareholder_collector.py` | 抓取机构持股数据 | 东方财富API | `{ticker}_shareholder.csv` | `python shareholder_collector.py [--ticker 300433.SZ]` |
-| `shareholder_num_collector.py` | 抓取股东户数、户均持股等历史数据 | 东方财富API | `{ticker}_shareholder_num.csv` | `python shareholder_num_collector.py [--ticker 300433.SZ]` |
-| `north_holdings.py` | 获取北向资金持股数据 | 东方财富API | `{ticker}_north_holdings.csv` | `python north_holdings.py [--ticker 300433.SZ]` |
-| `north_fund_collector.py` | 抓取北向资金逐日持股数据 | 东方财富API | `{ticker}_north_fund.csv` | `python north_fund_collector.py` |
-| `em_financial_collector.py` | 抓取东方财富财务数据 | 东方财富API | `{ticker}_dupont_data.csv`<br>`{ticker}_growth_ratio_data.csv` | `python em_financial_collector.py [--ticker 300433.SZ]` |
-| `important_missing_data_collector.py` | 抓取重要缺失数据 | 多个数据源 | 各种缺失数据文件 | `python important_missing_data_collector.py [--ticker 300433.SZ]` |
-| `db_collector.py` | 数据库数据收集 | 数据库 | 数据库数据文件 | `python db_collector.py` |
+| 程序名称 | 功能 | 数据源 | 输出物 |
+|---------|------|--------|--------|
+| `data_collector.py` | 历史行情数据（前复权） | akshare | `{ticker}_qfq.csv` |
+| `stock_market_data_collector.py` | 资金流、融资融券、估值数据 | akshare | `{ticker}_fund_flow.csv` / `_margin_data.csv` / `_valuation.csv` |
+| `stock_company_info_collector.py` | 公司基本信息、研报、股东、财务报表 | akshare | `{ticker}_company_basic.json` / `_research_reports.csv` 等 |
+| `eastmoney_fetcher.py` ⭐ | **统一东方财富数据抓取入口** (`--type market_performance\|industry_valuation\|industry_peers\|industry_growth\|dupont`) | 东方财富 API | 各类行业/市场数据 |
+| `financial_indicators_collector.py` | 财务指标、成长指标、现金流指标 | akshare | `{ticker}_financial_indicators.json` |
+| `shareholders_collector.py` | 前十大股东历史数据 | 东方财富 API | `{ticker}_historical_shareholders.csv` |
+| `shareholder_num_collector.py` | 股东户数、户均持股 | 东方财富 API | `{ticker}_shareholder_num.csv` |
+| `north_holdings.py` | 北向资金持股 | 东方财富 API | `{ticker}_north_holdings.csv` |
+| `org_hold_collector.py` | 机构持仓明细 | 东方财富 API | `{ticker}_institutional_holdings.csv` |
+| `em_financial_collector.py` | 东方财富财务数据 | 东方财富 API | `{ticker}_dupont_data.csv` / `_growth_ratio_data.csv` |
+| `important_missing_data_collector.py` | 业绩预告与分红数据 | 多数据源 | `{ticker}_performance_forecast.csv` / `_ex_dividend.csv` |
+| `shenwan_industry_collector.py` | 申万行业分类 | 东方财富 API | `{ticker}_industry_info.json` |
+| `batch_margin_collector.py` ⭐ | 批量融资融券数据采集 | akshare | 多股票 `_margin_data.csv` |
+| `index_data_collector.py` | 指数数据采集 | akshare | 指数数据文件 |
 
 ### 2. 数据分析类
 
-| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
-|---------|------|-----------|--------|----------|
-| `analyze_financial_statements.py` | 财务报表分析 | `{ticker}_company_basic.json`<br>`{ticker}_financial_profit.csv`<br>`{ticker}_financial_balance.csv`<br>`{ticker}_financial_indicators.json` | `./data/{ticker}/{ticker}_financial_analysis_{timestamp}.md` | `python analyze_financial_statements.py --ticker 300433.SZ` |
-| `analyze_fund_flow.py` | 资金流分析 | `{ticker}_fund_flow.csv` | `./data/{ticker}/{ticker}_fund_flow_analysis_{timestamp}.md` | `python analyze_fund_flow.py --ticker 300433.SZ` |
-| `analyze_margin_data.py` | 融资融券分析 | `{ticker}_margin_data.csv` | `./data/{ticker}/{ticker}_margin_data_analysis_{timestamp}.md` | `python analyze_margin_data.py --ticker 300433.SZ` |
-| `analyze_research_reports.py` | 研究报告分析 | `{ticker}_company_basic.json`<br>`{ticker}_research_reports.csv` | `./data/{ticker}/{ticker}_research_reports_analysis_{timestamp}.md` | `python analyze_research_reports.py --ticker 300433.SZ` |
-| `analyze_shareholder_structure.py` | 股东结构分析 | `{ticker}_company_basic.json`<br>`{ticker}_main_shareholders.csv`<br>`{ticker}_shareholder.csv`<br>`{ticker}_shareholder_num.csv`<br>`{ticker}_north_fund.csv` | `./data/{ticker}/{ticker}_shareholder_structure_analysis_{timestamp}.md` | `python analyze_shareholder_structure.py --ticker 300433.SZ` |
-| `analyze_valuation_data.py` | 估值分析 | `{ticker}_valuation.csv` | `./data/{ticker}/{ticker}_valuation_analysis_{timestamp}.md` | `python analyze_valuation_data.py --ticker 300433.SZ` |
-| `analyze_technical_trend.py` | 技术趋势分析 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_technical_trend_analysis.json` | `python analyze_technical_trend.py [--ticker 300433.SZ]` |
-| `analyze_em_financial.py` | 东方财富财务分析 | 东方财富数据文件 | 财务分析报告 | `python analyze_em_financial.py --ticker 300433.SZ` |
-| `analyze_performance_forecast.py` | 业绩预测分析 | 业绩预测数据文件 | 业绩预测分析报告 | `python analyze_performance_forecast.py --ticker 300433.SZ` |
-| `daily/data_analysis.py` | 股票数据质量检查和可视化分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_price_volume.png`<br>`./data/{ticker}/{ticker}_technical_indicators.png`<br>`./data/{ticker}/{ticker}_bollinger_bands.png`<br>`./data/{ticker}/{ticker}_correlation.png` | `python daily/data_analysis.py [--ticker 300433.SZ]` |
-| `daily/technical_analysis.py` | 技术指标信号分析和有效性评估 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_signal_analysis.png` | `python daily/technical_analysis.py [--ticker 300433.SZ]` |
-| `daily/quantitative_strategy.py` | 基于技术指标的量化交易策略回测 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_strategy_results.png`<br>`./data/{ticker}/{ticker}_trading_signals.csv` | `python daily/quantitative_strategy.py [--ticker 300433.SZ]` |
-| `daily/strategy_optimization.py` | 优化量化交易策略的参数 | `{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_optimization_results.png` | `python daily/strategy_optimization.py [--ticker 300433.SZ]` |
-| `daily/daily_strategy_optimization_multistock.py` | 多股票策略优化 | 多个股票的指标数据 | 多股票优化结果文件 | `python daily/daily_strategy_optimization_multistock.py` |
-| `daily/stock_quantitative_analyzer.py` | 股票量化分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `./data/{ticker}/{ticker}_analysis_{date}.csv`<br>`./data/{ticker}/{ticker}_analysis_{date}.png` | `python daily/stock_quantitative_analyzer.py [--ticker 300433.SZ]` |
-| `daily/trend_channel_analyzer.py` | 趋势通道分析 | `{ticker}_qfq.csv` | `./data/{ticker}/{ticker}_trend_channel_results.png`<br>`./data/{ticker}/{ticker}_trend_channel_signals.csv` | `python daily/trend_channel_analyzer.py [--ticker 300433.SZ]` |
-| `weekly/weekly_data_analysis.py` | 周线数据质量检查和可视化分析 | 周线数据文件 | 周线分析图表 | `python weekly/weekly_data_analysis.py` |
-| `weekly/weekly_quantitative_strategy.py` | 基于周线的量化交易策略回测 | 周线数据文件 | 周线策略回测结果 | `python weekly/weekly_quantitative_strategy.py` |
-| `weekly/weekly_strategy_optimization.py` | 周线策略参数优化 | 周线数据文件 | 周线策略优化结果 | `python weekly/weekly_strategy_optimization.py` |
-| `weekly/weekly_strategy_optimization_multistock.py` | 多股票周线策略优化 | 多个股票的周线数据 | 多股票周线优化结果 | `python weekly/weekly_strategy_optimization_multistock.py` |
-| `weekly/weekly_stock_analyzer.py` | 周线综合分析 | 周线数据文件 | 周线分析报告 | `python weekly/weekly_stock_analyzer.py` |
-| `daily_trend_strategy.py` | 日线趋势策略分析 | 日线数据文件 | 趋势策略分析结果 | `python daily_trend_strategy.py` |
+| 程序名称 | 功能 | 输出物 |
+|---------|------|--------|
+| `analyze_financial_statements.py` | 财务报表 AI 分析 | `{ticker}_financial_analysis_{timestamp}.md` |
+| `analyze_fund_flow.py` | 资金流 AI 分析 | `{ticker}_fund_flow_analysis_{timestamp}.md` |
+| `analyze_margin_data.py` | 融资融券 AI 分析 | `{ticker}_margin_data_analysis_{timestamp}.md` |
+| `analyze_research_reports.py` | 研究报告 AI 分析 | `{ticker}_research_reports_analysis_{timestamp}.md` |
+| `analyze_shareholder_structure.py` | 股东结构 AI 分析 | `{ticker}_shareholder_structure_analysis_{timestamp}.md` |
+| `analyze_valuation_data.py` | 估值 AI 分析 | `{ticker}_valuation_analysis_{timestamp}.md` |
+| `analyze_technical_trend.py` | 技术趋势 AI 分析（支持 `--strategy` 切换策略视角） | `{ticker}_technical_trend_analysis.json` |
+| `analyze_em_financial.py` | 东方财富财务 AI 分析 | 财务分析报告 |
+| `analyze_performance_forecast.py` | 业绩预测 AI 分析 | 业绩预测分析报告 |
+| `analyze_peer_comparison.py` | 同行对比 AI 分析 | 同行对比分析报告 |
+| `calculate_financial_indicators.py` | 综合财务指标计算（盈利能力/偿债能力/运营能力/现金流/成长能力） | `{ticker}_financial_indicators_calculated.json` |
+| `calculate_technical_trend_ds.py` ⭐ | DeepSeek 技术趋势分析 | 技术趋势分析数据 |
+| `daily/data_analysis.py` | 数据质量检查 + 可视化（16 项指标含 OBV/ATR/ADX/MFI） | 价格/成交量/布林带/相关性图表 |
+| `daily/technical_analysis.py` | 技术指标信号分析与有效性评估 | 信号分析图表 |
+| `daily/quantitative_strategy.py` | 量化策略回测（含信号去重） | 策略回测图表 + 交易信号 CSV |
+| `daily/strategy_optimization.py` | 策略参数优化 | 优化结果图表 |
+| `daily/trend_channel_analyzer.py` | 趋势通道分析 | 趋势通道图表 + 信号 CSV |
+| `daily/stock_quantitative_analyzer.py` | 股票量化综合分析 | 分析 CSV + 图表 |
+| `weekly/` | 周线分析（数据检查/策略回测/优化/综合分析/AI预测） | 周线分析报告 |
 
-### 3. AI分析类
+### 3. Process/ 分析引擎 ⭐ (v1.2 新增)
 
-| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
-|---------|------|-----------|--------|----------|
-| `daily/ai_model.py` | 使用机器学习模型对股票价格进行预测和分析 | `{ticker}_indicators.csv` | `{ticker}_ai_predictions.png`<br>`{ticker}_feature_importance.png` | `python daily/ai_model.py [--ticker 300433.SZ]` |
-| `daily/stock_prediction.py` | 股票价格预测 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | 预测结果图表和数据文件 | `python daily/stock_prediction.py` |
-| `weekly/weekly_stock_prediction.py` | 周线价格预测 | 周线数据文件 | 周线预测结果 | `python weekly/weekly_stock_prediction.py` |
+五维度 JSON 摘要 + 两层决策系统：
 
-### 4. LLM分析类
+| 模块 | 功能 |
+|------|------|
+| `Process/financial_structured_analyzer.py` | 财务数据 → 结构化 JSON（盈利能力/成长性/风险） |
+| `Process/sentiment_valuation_analyzer.py` | 情绪 + 估值 → JSON（市场情绪/估值分位/技术情绪） |
+| `Process/shareholder_structure_analyzer.py` | 股东结构 → JSON（集中度/机构动向/北向资金） |
+| `Process/research_report_analyzer.py` | 研报观点 → JSON（评级分布/目标价/关键观点） |
+| `Process/financial_analysis_enhancer.py` | 财务深度增强分析 |
+| `Process/multi_strategy_analyzer.py` | 多策略 LLM 分析（趋势跟踪/均值回归/波段） |
+| `Process/two_layer_decision_analyzer.py` | **两层决策** — 冲突检测 + 持仓交易计划 |
 
-| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
-|---------|------|-----------|--------|----------|
-| `stock_ai_comprehensive_analyzer.py` | 综合股票的财务报表、资金流、融资融券和估值分析报告，发送给本地Ollama AI进行综合分析 | 各种分析报告文件 | `{ticker}_comprehensive_analysis_{timestamp}.md`<br>`{ticker}_prompt_info_{timestamp}.md` | `python stock_ai_comprehensive_analyzer.py [--ticker 300433.SZ]` |
-| `daily/stock_ai_local_analyzer.py` | 将股票数据发送给本地Ollama AI进行分析 | `{ticker}_qfq.csv`<br>`{ticker}_indicators.csv` | `{ticker}_{timestamp}.md`<br>`{ticker}_support_resistance.png` | `python daily/stock_ai_local_analyzer.py [--ticker 300433.SZ]` |
-| `weekly/weekly_stock_ai_local_analyzer.py` | 周线AI分析 | 周线数据文件 | 周线AI分析报告 | `python weekly/weekly_stock_ai_local_analyzer.py` |
+### 4. AI / LLM 分析类
 
-### 5. 工具和自动化类
+| 程序名称 | 功能 |
+|---------|------|
+| `stock_ai_comprehensive_analyzer.py` | 综合各维度分析报告 → Ollama AI 综合分析 |
+| `daily/stock_ai_local_analyzer.py` | K 线数据 → Ollama AI 日线分析 |
+| `weekly/weekly_stock_ai_local_analyzer.py` | 周线数据 → Ollama AI 周线分析 |
 
-| 程序名称 | 功能 | 引用数据源 | 输出物 | 调用方法 |
-|---------|------|-----------|--------|----------|
-| `check_data_updates.py` | 检查指定股票的数据文件是否是最新日期以及是否有数据文件缺失 | 数据文件 | 无（自动更新数据文件） | `python check_data_updates.py [--ticker 300433.SZ]` |
-| `check_periodic_data_updates.py` | 检查定期数据更新 | 定期数据文件 | 无（自动更新数据文件） | `python check_periodic_data_updates.py [--ticker 300433.SZ]` |
-| `batch_analyze_all.py` | 批量对多只股票执行完整的分析流程 | 所有分析脚本 | 各股票的分析结果文件 | `python batch_analyze_all.py [--ticker 300433.SZ]` |
-| `batch_analyze_daily.py` | 批量执行日线分析 | 日线分析脚本 | 各股票的日线分析结果 | `python batch_analyze_daily.py [--ticker 300433.SZ]` |
-| `batch_analyze_periodic.py` | 批量执行定期数据分析 | 定期分析脚本 | 各股票的定期分析结果 | `python batch_analyze_periodic.py [--ticker 300433.SZ]` |
-| `separate_company_info.py` | 将公司信息分离为多个文件 | `{ticker}_company_info.json` | 分离后的多个文件 | `python separate_company_info.py [--ticker 300433.SZ]` |
-| `manage_logs.py` | 日志管理 | 日志文件 | 管理后的日志文件 | `python manage_logs.py` |
-| `trading_records.py` | 交易记录管理 | 交易记录文件 | 管理后的交易记录 | `python trading_records.py` |
-| `utils.py` | 通用工具函数，包含技术指标计算 | 无 | 无 | 被其他脚本引用 |
-| `web_ui.py` | Web界面 | 各种数据文件 | Web界面 | `python web_ui.py` |
-| `api/analysis.py` | 分析API | 分析结果文件 | API响应 | 被Web界面调用 |
-| `api/detailed.py` | 详细信息API | 各种数据文件 | API响应 | 被Web界面调用 |
-| `api/report_viewer.py` | 报告查看API | 分析报告文件 | API响应 | 被Web界面调用 |
-| `api/trading.py` | 交易API | 交易记录文件 | API响应 | 被Web界面调用 |
-| `report_viewer.py` | 报告查看器 | 分析报告文件 | 报告查看界面 | `python report_viewer.py` |
+### 5. 回测系统 ⭐
 
-### 6. 配置文件
+| 程序名称 | 功能 |
+|---------|------|
+| `trend_following_backtest.py` | 趋势跟踪策略回测引擎 |
+| `backtest_all_stocks.py` | 全股票批量回测 |
 
-| 文件名 | 功能 | 内容 |
-|-------|------|------|
-| `config.py` | 存储系统配置参数 | 股票代码、持仓情况、交易记录、历史数据日期范围、技术指标参数等 |
-| `requirements.txt` | 依赖项列表 | 系统所需的Python包 |
+### 6. Web 界面 & API
+
+| 程序名称 | 功能 |
+|---------|------|
+| `web_ui.py` | Flask Web 主界面（`http://localhost:8081`） |
+| `api/analysis.py` | 完整分析 API（全量数据 + 五维度 + 两层决策） |
+| `api/quick_analysis.py` ⭐ | 快速分析 API（仅 K 线 + 技术趋势，三种策略视角） |
+| `api/backtest.py` ⭐ | 回测 API |
+| `api/detailed.py` | 详细模式 API（单步数据抓取/分析/查询） |
+| `api/trading.py` | 交易记录管理 API |
+| `api/report_viewer.py` | 报告查看 API |
+| `api/common.py` ⭐ | 共享模块（交易所映射、任务队列、步骤执行引擎） |
+| `report_viewer.py` | 独立报告查看器 |
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.9+
+- [Ollama](https://ollama.com/)（本地 AI 分析）
+- TA-Lib（技术指标计算）
+
+### 安装
+
+```bash
+pip install -r requirements.txt
+cp config.example.py config.py  # 编辑 config.py 填入你的配置
+```
+
+### Web 界面使用（推荐）
+
+```bash
+python web_ui.py
+# 打开浏览器访问 http://localhost:8081
+```
+
+**三种分析模式：**
+
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| 🔍 **完整分析** | 全量数据采集 + 五维度 + 两层决策 | 新股票初始化 |
+| ⚡ **快速分析** | 仅 K 线 + 技术趋势 | 每日盘后快速查看 |
+| 📊 **回测** | 趋势跟踪策略回测 | 验证交易策略 |
+
+---
 
 ## 执行流程
 
-1. **数据抓取**
-   - 运行数据抓取类程序获取股票数据
-   - 优先运行 `stock_company_info_collector.py` 获取公司基本信息
-   - 然后运行 `data_collector.py` 和 `stock_market_data_collector.py` 获取市场数据
-   - 最后运行其他数据抓取程序获取补充数据
+### 完整分析（新股票初始化）
+```
+数据采集 (16 步) → 技术指标计算 → 五维度 JSON 摘要 → 两层决策 → 综合报告
+```
 
-2. **数据处理**
-   - 运行 `separate_company_info.py` 分离公司信息（如果需要）
-   - 运行 `check_data_updates.py` 检查数据更新情况
+### 快速分析（每日更新）
+```
+日更数据更新 → 技术趋势计算 → 技术趋势 AI 分析（3 种策略视角可选）
+```
 
-3. **数据分析**
-   - 运行数据分析类程序进行各种分析
-   - 可以使用 `batch_analyze_daily.py` 批量执行日线分析
-   - 使用 `batch_analyze_periodic.py` 批量执行定期数据分析
+### 命令行使用
 
-4. **AI分析**
-   - 运行AI分析类程序进行机器学习预测
-   - 运行LLM分析类程序获取AI分析报告
-   - 使用 `stock_ai_comprehensive_analyzer.py` 获取综合分析报告
+```bash
+# 统一批量分析
+python batch_analyze.py --mode periodic --ticker 300433.SZ
+python batch_analyze.py --mode daily --ticker 300433.SZ
 
-5. **自动化运行**
-   - 可以设置定时任务自动执行数据抓取和分析
-   - 监控数据更新情况，确保数据及时更新
+# 统一数据抓取
+python eastmoney_fetcher.py --type market_performance --ticker 300433.SZ
+python eastmoney_fetcher.py --type dupont --ticker 300433.SZ
+
+# 数据更新检查
+python check_data_updates.py --mode daily --ticker 300433.SZ
+python check_data_updates.py --mode periodic --ticker 300433.SZ
+
+# 技术趋势分析（切换策略视角）
+python analyze_technical_trend.py --strategy trend_following --ticker 300433.SZ
+python analyze_technical_trend.py --strategy swing --ticker 300433.SZ
+```
+
+---
+
+## 配置
+
+编辑 `config.py`（从 `config.example.py` 复制）：
+
+```python
+# 股票代码
+STOCK_TICKERS = {
+    'example': '002594.SZ',
+}
+
+# AI 模型（Ollama）
+AI_CONFIG = {
+    'base_url': 'http://localhost:11434',
+    'model': 'qwen3.6:35b-a3b-coding-nvfp4',
+    'temperature': 0.3,
+    'max_tokens': 8192,
+    'trading_strategy': 'neutral',          # trend_following / mean_reversion / swing / neutral
+}
+
+# 交易记录（在 trading_records.py 中定义）
+from trading_records import TRADING_RECORDS
+```
+
+---
 
 ## 依赖项
 
-- pandas
-- numpy
-- matplotlib
-- seaborn
-- yfinance
-- akshare
-- TA-Lib
-- scikit-learn
-- schedule
-- requests
-- pyperclip
+```
+pandas, numpy, matplotlib, seaborn, yfinance, akshare, TA-Lib,
+scikit-learn, schedule, requests, flask
+```
+
+---
 
 ## 注意事项
 
-- 确保已安装所有依赖项
-- 对于国内股票，优先使用akshare数据源
-- 技术指标计算需要TA-Lib库支持
-- 本地AI分析需要部署Ollama服务
-- 数据抓取脚本位于根目录，分析脚本分别位于daily和weekly目录
-- 所有数据抓取程序均采用增量保存方式，避免数据丢失
-- 数据文件存储在 `./data/{ticker}/` 目录下，按股票代码分类
+- 国内股票优先使用 akshare 数据源
+- 技术指标计算需要 TA-Lib 库支持
+- 本地 AI 分析需要部署 Ollama 服务
+- 所有数据采集程序采用增量保存，避免数据丢失
+- 数据文件存储在 `./data/{ticker}/` 目录下
+- `config.py` 和 `trading_records.py` 包含敏感信息，已加入 `.gitignore`
 
-## 最新更新
+---
 
-- 所有数据抓取程序已改为增量保存，确保数据的完整性和一致性
-- 公司信息已分离为多个专用文件，提高数据管理的清晰度和效率
-- 新增了多种分析脚本，提供更全面的股票分析功能
-- 优化了AI分析流程，提供更准确的分析报告
+## 版本历史
+
+| 版本 | 日期 | 主要变更 |
+|------|------|---------|
+| **v1.2.0** | 2026-05 | 架构重构：统一入口、Process/引擎、两层决策、快速分析、回测系统 |
+| v1.1.0 | 2026-03 | 41 模块：Web 界面、12 个新采集器、5 个新分析引擎 |
+| v1.0.1 | 2026-02 | 18 模块：数据采集 + 基础分析 |
+
+详见 [CHANGELOG.md](CHANGELOG.md)
