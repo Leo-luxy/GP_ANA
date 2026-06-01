@@ -1,6 +1,12 @@
 # GP_ANA — A 股 AI 综合分析系统
 
-> 🧠 基于本地 Ollama 大模型的 A 股智能分析平台：数据采集 → 多维分析 → 策略回测 → Web 可视化，完整闭环。
+> 🧠 **GP_ANA** 是一个面向 A 股市场的全流程智能分析平台。系统从 20+ 数据源自动采集行情、财务、资金流、融资融券、股东结构、行业对比等多维数据，通过 **本地 Ollama 大模型或第三方 API（如 OpenAI / DeepSeek / 通义千问等）** 驱动 AI 分析引擎，生成从基本面到技术面的完整分析报告与交易决策建议。同时内置量化策略回测系统和 Flask Web 可视化界面，形成 **数据采集 → 多维分析 → AI 决策 → 策略回测 → 可视交互** 的完整闭环。
+>
+> **适用场景**：个人量化研究、A 股投资决策辅助、策略回测验证。
+>
+> **AI 模型支持**：
+> - 🖥️ **本地部署**：Ollama（默认），数据不出本机，隐私安全
+> - ☁️ **第三方 API**：兼容 OpenAI / DeepSeek / 通义千问等任意 OpenAI 兼容接口，灵活扩展
 
 **当前版本：v1.2.0**
 
@@ -10,11 +16,11 @@
 
 | 能力 | 说明 |
 |------|------|
-| 📡 **数据采集** | 20+ 数据采集器，覆盖行情、财务、资金流、融资融券、股东、行业等 |
-| 📊 **多维分析** | 财务、资金流、融资融券、估值、技术趋势、股东结构、同行对比、研报观点 |
-| 🧠 **AI 决策** | 五维度 JSON 摘要 + 两层决策（冲突检测 → 交易计划），支持 3 种策略模式 |
-| 📈 **策略回测** | 趋势跟踪回测，含信号去重、实际执行追踪 |
-| 🌐 **Web 界面** | Flask Web UI（localhost:8081），完整分析 / 快速分析 / 回测 / 交易记录管理 |
+| 📡 **数据采集** | 20+ 采集器，覆盖行情、财务、资金流、融资融券、股东、行业、研报等 |
+| 📊 **多维分析** | 财务质量、资金流向、融资融券、估值水平、技术趋势、股东结构、同行对比、研报观点 — 八大维度 |
+| 🧠 **AI 决策** | 五维度 JSON 摘要 + 两层决策引擎（冲突检测 → 交易计划），3 种策略模式（趋势跟踪/波段/均值回归） |
+| 📈 **策略回测** | 趋势跟踪回测系统，含信号去重、实际执行追踪、多股票批量回测 |
+| 🌐 **Web 界面** | Flask Web UI（localhost:8081），完整分析 / 快速分析 / 回测 / 交易记录管理，一站式操作 |
 | 🔧 **统一入口** | `eastmoney_fetcher.py` 统一数据抓取，`batch_analyze.py --mode` 统一批量分析 |
 
 ---
@@ -82,9 +88,9 @@
 
 | 程序名称 | 功能 |
 |---------|------|
-| `stock_ai_comprehensive_analyzer.py` | 综合各维度分析报告 → Ollama AI 综合分析 |
-| `daily/stock_ai_local_analyzer.py` | K 线数据 → Ollama AI 日线分析 |
-| `weekly/weekly_stock_ai_local_analyzer.py` | 周线数据 → Ollama AI 周线分析 |
+| `stock_ai_comprehensive_analyzer.py` | 综合各维度分析报告 → AI 大模型综合分析（支持本地 Ollama / 第三方 API） |
+| `daily/stock_ai_local_analyzer.py` | K 线数据 → AI 日线分析 |
+| `weekly/weekly_stock_ai_local_analyzer.py` | 周线数据 → AI 周线分析 |
 
 ### 5. 回测系统 ⭐
 
@@ -185,13 +191,22 @@ STOCK_TICKERS = {
     'example': '002594.SZ',
 }
 
-# AI 模型（Ollama）
+# AI 模型配置（支持本地 Ollama 或第三方 API）
 AI_CONFIG = {
+    # 本地 Ollama（默认）
     'base_url': 'http://localhost:11434',
     'model': 'qwen3.6:35b-a3b-coding-nvfp4',
     'temperature': 0.3,
     'max_tokens': 8192,
     'trading_strategy': 'neutral',          # trend_following / mean_reversion / swing / neutral
+    'fallback_models': ['qwen3.6:35b-a3b-coding-nvfp4'],
+    # 第三方 API（可选，兼容 OpenAI / DeepSeek / 通义千问等）
+    # 'external_api': {
+    #     'enabled': True,
+    #     'api_key': 'your-api-key',
+    #     'api_url': 'https://api.openai.com/v1',
+    #     'model': 'gpt-4o',
+    # },
 }
 
 # 交易记录（在 trading_records.py 中定义）
