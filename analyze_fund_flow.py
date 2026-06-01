@@ -470,7 +470,7 @@ def get_ai_analysis(prompt):
             ],
             options={
                 "temperature": temperature,  # 降低随机性，提高准确性
-                "max_tokens": int(max_tokens/2)  # 足够的响应长度
+                "num_predict": max_tokens  # 足够的响应长度
             }
         )
         

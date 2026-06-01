@@ -150,7 +150,11 @@ def save_results(df, ticker, output_dir=None):
     if '涨跌额' not in df.columns:
         df['涨跌额'] = df['close'] - df['close'].shift(1)
     if '换手率' not in df.columns:
-        df['换手率'] = 0  # 默认为0，实际数据需要根据流通股本计算
+        # 优先从turnover列获取数据（_qfq.csv文件中的列名）
+        if 'turnover' in df.columns:
+            df['换手率'] = df['turnover']
+        else:
+            df['换手率'] = 0  # 默认为0，实际数据需要根据流通股本计算
     if 'ticker' not in df.columns:
         df['ticker'] = ticker
     

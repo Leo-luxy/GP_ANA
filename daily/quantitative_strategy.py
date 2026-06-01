@@ -1,4 +1,4 @@
-# quantitative_strategy.py
+# daily/quantitative_strategy.py
 # 功能：基于技术指标的量化交易策略回测
 # 实现原理：
 # 1. 加载股票历史数据，包括价格和技术指标
@@ -84,6 +84,37 @@ class QuantitativeStrategy:
                 self.data.loc[self.data.index[i], 'buy_signal'] = 0
                 print(f"日期 {self.data['date'].iloc[i]}: 同时出现买入和卖出信号，优先保留卖出信号")
         
+        # 5. 信号去重：确保同一趋势中只生成一次买入/卖出信号
+        # 去除连续的买入信号（只保留第一个）
+        in_position = False
+        for i in range(len(self.data)):
+            if self.data['buy_signal'].iloc[i] == 1 and not in_position:
+                in_position = True
+            elif self.data['buy_signal'].iloc[i] == 1 and in_position:
+                self.data.loc[self.data.index[i], 'buy_signal'] = 0
+            elif self.data['sell_signal'].iloc[i] == 1:
+                in_position = False
+        
+        # 去除连续的卖出信号（只保留第一个）
+        in_cash = True
+        for i in range(len(self.data)):
+            if self.data['sell_signal'].iloc[i] == 1 and not in_cash:
+                in_cash = True
+            elif self.data['sell_signal'].iloc[i] == 1 and in_cash:
+                self.data.loc[self.data.index[i], 'sell_signal'] = 0
+            elif self.data['buy_signal'].iloc[i] == 1:
+                in_cash = False
+        
+        # 6. 确保买入和卖出信号交替出现
+        # 检查并修复连续相同信号问题
+        for i in range(1, len(self.data)):
+            # 如果连续两天都是买入信号且前一天已经买入，则取消当天的买入信号
+            if self.data['buy_signal'].iloc[i] == 1 and self.data['buy_signal'].iloc[i-1] == 1:
+                self.data.loc[self.data.index[i], 'buy_signal'] = 0
+            # 如果连续两天都是卖出信号且前一天已经卖出，则取消当天的卖出信号
+            if self.data['sell_signal'].iloc[i] == 1 and self.data['sell_signal'].iloc[i-1] == 1:
+                self.data.loc[self.data.index[i], 'sell_signal'] = 0
+        
         return self.data
     
     def backtest_strategy(self):
@@ -94,6 +125,11 @@ class QuantitativeStrategy:
         self.position = 0
         self.cash = self.initial_capital
         self.portfolio_value = []
+        self.trades = []  # 记录实际执行的交易
+        
+        # 初始化实际执行信号列
+        self.data['actual_buy'] = 0
+        self.data['actual_sell'] = 0
         
         # 遍历每一个交易日
         for i in range(len(self.data)):
@@ -109,12 +145,35 @@ class QuantitativeStrategy:
                 self.position = shares_to_buy
                 self.cash -= shares_to_buy * close_price
                 print(f"{date}: 买入 {shares_to_buy} 股，价格: {close_price:.2f}")
+                
+                # 标记实际执行的买入信号
+                self.data.loc[self.data.index[i], 'actual_buy'] = 1
+                
+                # 记录交易
+                self.trades.append({
+                    'type': 'buy',
+                    'date': date,
+                    'price': close_price,
+                    'shares': shares_to_buy
+                })
             
             # 执行卖出信号
             elif sell_signal == 1 and self.position > 0:
                 # 卖出所有持仓
                 self.cash += self.position * close_price
                 print(f"{date}: 卖出 {self.position} 股，价格: {close_price:.2f}")
+                
+                # 标记实际执行的卖出信号
+                self.data.loc[self.data.index[i], 'actual_sell'] = 1
+                
+                # 记录交易
+                self.trades.append({
+                    'type': 'sell',
+                    'date': date,
+                    'price': close_price,
+                    'shares': self.position
+                })
+                
                 self.position = 0
             
             # 计算当前portfolio价值
@@ -126,6 +185,19 @@ class QuantitativeStrategy:
             final_price = self.data['close'].iloc[-1]
             self.cash += self.position * final_price
             print(f"{self.data['date'].iloc[-1]}: 结束回测，卖出 {self.position} 股，价格: {final_price:.2f}")
+            
+            # 标记实际执行的卖出信号
+            self.data.loc[self.data.index[-1], 'actual_sell'] = 1
+            
+            # 记录交易
+            self.trades.append({
+                'type': 'sell',
+                'date': self.data['date'].iloc[-1],
+                'price': final_price,
+                'shares': self.position,
+                'exit_type': 'end_of_backtest'
+            })
+            
             self.position = 0
         
         # 计算最终portfolio价值
@@ -135,6 +207,7 @@ class QuantitativeStrategy:
         print(f"\n初始资金: {self.initial_capital:.2f}")
         print(f"最终资金: {final_value:.2f}")
         print(f"总收益率: {total_return:.2f}%")
+        print(f"实际交易次数: {len(self.trades)}")
         
         return final_value, total_return
     
@@ -213,12 +286,12 @@ class QuantitativeStrategy:
         if not os.path.exists(stock_dir):
             os.makedirs(stock_dir)
         
-        # 提取买入信号
-        buy_signals = self.data[self.data['buy_signal'] == 1][['date', 'close', 'RSI', 'MA5', 'MA20', 'BB_lower', 'BB_upper']].copy()
+        # 提取实际执行的买入信号（而非原始信号）
+        buy_signals = self.data[self.data['actual_buy'] == 1][['date', 'close', 'RSI', 'MA5', 'MA20', 'BB_lower', 'BB_upper']].copy()
         buy_signals['signal_type'] = 'buy'
         
-        # 提取卖出信号
-        sell_signals = self.data[self.data['sell_signal'] == 1][['date', 'close', 'RSI', 'MA5', 'MA20', 'BB_lower', 'BB_upper']].copy()
+        # 提取实际执行的卖出信号（而非原始信号）
+        sell_signals = self.data[self.data['actual_sell'] == 1][['date', 'close', 'RSI', 'MA5', 'MA20', 'BB_lower', 'BB_upper']].copy()
         sell_signals['signal_type'] = 'sell'
         
         # 合并信号
@@ -235,6 +308,13 @@ class QuantitativeStrategy:
         all_signals.to_csv(signals_path, index=False, encoding='utf-8-sig')
         print(f"交易信号数据已保存为: {signals_path}")
         
+        # 保存实际交易记录
+        if hasattr(self, 'trades') and self.trades:
+            trades_df = pd.DataFrame(self.trades)
+            trades_path = os.path.join(stock_dir, f'{self.ticker}_actual_trades.csv')
+            trades_df.to_csv(trades_path, index=False, encoding='utf-8-sig')
+            print(f"实际交易记录已保存为: {trades_path}")
+        
         return signals_path
     
     def plot_results(self):
@@ -248,20 +328,20 @@ class QuantitativeStrategy:
         
         plt.figure(figsize=(15, 12))
         
-        # 价格走势与交易信号
+        # 价格走势与实际交易信号
         plt.subplot(3, 1, 1)
         plt.plot(self.data['date'], self.data['close'], label='收盘价', color='blue')
         plt.plot(self.data['date'], self.data['BB_upper'], label='布林带上轨', color='red', linestyle='--')
         plt.plot(self.data['date'], self.data['BB_middle'], label='布林带中轨', color='green', linestyle='--')
         plt.plot(self.data['date'], self.data['BB_lower'], label='布林带下轨', color='purple', linestyle='--')
         
-        # 标记买入卖出信号
-        buy_signals = self.data[self.data['buy_signal'] == 1]
-        sell_signals = self.data[self.data['sell_signal'] == 1]
-        plt.scatter(buy_signals['date'], buy_signals['close'], marker='^', color='green', label='买入信号', s=100)
-        plt.scatter(sell_signals['date'], sell_signals['close'], marker='v', color='red', label='卖出信号', s=100)
+        # 标记实际执行的买入卖出信号（而非原始信号）
+        actual_buy_signals = self.data[self.data['actual_buy'] == 1]
+        actual_sell_signals = self.data[self.data['actual_sell'] == 1]
+        plt.scatter(actual_buy_signals['date'], actual_buy_signals['close'], marker='^', color='green', label='实际买入', s=120, edgecolor='black')
+        plt.scatter(actual_sell_signals['date'], actual_sell_signals['close'], marker='v', color='red', label='实际卖出', s=120, edgecolor='black')
         
-        plt.title(f'{self.ticker} 价格走势与交易信号')
+        plt.title(f'{self.ticker} 价格走势与实际交易信号')
         plt.xlabel('日期')
         plt.ylabel('价格')
         plt.legend()
@@ -271,6 +351,19 @@ class QuantitativeStrategy:
         plt.subplot(3, 1, 2)
         plt.plot(self.data['date'], self.portfolio_value, label='Portfolio价值', color='purple')
         plt.axhline(y=self.initial_capital, color='gray', linestyle='--', label='初始资金')
+        
+        # 在portfolio价值图上标记交易点
+        for trade in getattr(self, 'trades', []):
+            trade_date = trade['date']
+            idx = self.data[self.data['date'] == trade_date].index
+            if len(idx) > 0:
+                idx = idx[0]
+                if idx < len(self.portfolio_value):
+                    if trade['type'] == 'buy':
+                        plt.scatter(trade_date, self.portfolio_value[idx], marker='^', color='green', s=100)
+                    else:
+                        plt.scatter(trade_date, self.portfolio_value[idx], marker='v', color='red', s=100)
+        
         plt.title(f'{self.ticker} Portfolio价值走势')
         plt.xlabel('日期')
         plt.ylabel('价值')

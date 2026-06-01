@@ -1,4 +1,4 @@
-# analyze_technical_trend_ds.py
+# calculate_technical_trend_ds.py
 # 功能：从已包含技术指标的CSV文件中加载数据，分析各指标趋势，生成结构化报告
 # 实现原理：
 # 1. 加载本地股票数据文件（包含OHLCV及各类技术指标）
@@ -152,7 +152,7 @@ class StockTechnicalTrendAnalyzer:
         # 2. MACD 多头动能强度 (基于红柱大小与趋势)
         macd_hist = self.technical_indicators.get('MACD_hist', 0)
         if macd_hist > 0:
-            # 归一化到 0~1，假设最大红柱历史最大为 10（可根据数据动态调整）
+            # 归一化到 0~1，使用历史数据动态调整
             hist_series = self._safe_series('MACD_hist')
             if hist_series is not None and len(hist_series) > 0:
                 max_hist = max(abs(hist_series))
@@ -160,7 +160,20 @@ class StockTechnicalTrendAnalyzer:
             else:
                 scores['macd_power'] = 0.5
         else:
-            scores['macd_power'] = 0.2
+            # 绿柱时，返回较低的动量强度
+            # 即使绿柱缩短，只要在零轴下方，动量强度应该较低
+            hist_series = self._safe_series('MACD_hist')
+            if hist_series is not None and len(hist_series) > 0:
+                # 计算绿柱的相对强度
+                min_hist = min(hist_series)
+                if min_hist < 0:
+                    # 绿柱越接近零，强度越高，但最高不超过0.4
+                    green_strength = min(0.4, 1.0 - (abs(macd_hist) / abs(min_hist)))
+                    scores['macd_power'] = green_strength
+                else:
+                    scores['macd_power'] = 0.2
+            else:
+                scores['macd_power'] = 0.2
 
         # 3. ADX 趋势强度 (直接使用归一化值，通常 ADX 0-100)
         adx = self.technical_indicators.get('ADX', 20)
@@ -180,12 +193,65 @@ class StockTechnicalTrendAnalyzer:
 
         # 5. 成交量资金流强度 (基于 Volume_Ratio 和 OBV 变化)
         vol_ratio = self.technical_indicators.get('Volume_Ratio', 1.0)
+        obv = self.technical_indicators.get('OBV', 0)
+        obv_series = self._safe_series('OBV')
+        volume_flow = 0.0
+        
+        # 基于量比
         if vol_ratio > 1.2:
-            scores['volume_flow'] = min(1.0, (vol_ratio - 1.0) / 2.0)
+            volume_flow += min(0.5, (vol_ratio - 1.0) / 2.0)
         elif vol_ratio < 0.8:
-            scores['volume_flow'] = -min(1.0, (1.0 - vol_ratio) / 1.0)
+            volume_flow -= min(0.5, (1.0 - vol_ratio) / 1.0)
+        
+        # 基于OBV变化
+        if obv_series is not None and len(obv_series) >= 10:
+            obv_change = (obv_series[-1] - obv_series[-10]) / abs(obv_series[-10]) if obv_series[-10] != 0 else 0
+            volume_flow += min(0.5, max(-0.5, obv_change))
+        
+        scores['volume_flow'] = volume_flow
+
+        # 6. 价格动量强度 (基于价格变化率)
+        close_series = self._safe_series('close')
+        if close_series is not None and len(close_series) >= 10:
+            # 使用5日价格变化率，与return_5d一致
+            price_change = (close_series[-1] - close_series[-5]) / close_series[-5] if close_series[-5] != 0 else 0
+            # 归一化到 -1~1，负收益对应负动量
+            momentum = min(1.0, max(-1.0, price_change * 10))
+            scores['price_momentum'] = momentum
         else:
-            scores['volume_flow'] = 0.0
+            scores['price_momentum'] = 0.0
+
+        # 7. 指标背离检测
+        divergence_score = 1.0  # 默认为无背离
+        has_divergence = False
+        close_series = self._safe_series('close')
+        rsi_series = self._safe_series('RSI')
+        macd_hist_series = self._safe_series('MACD_hist')
+        
+        if close_series is not None and rsi_series is not None and len(close_series) >= 16:
+            # 检测价格创新高但RSI未创新高的顶背离
+            recent_high = max(close_series[-16:])
+            high_idx = np.argmax(close_series[-16:]) + len(close_series) - 16
+            if high_idx == len(close_series) - 1:  # 当前价格是近16日高点
+                rsi_high = max(rsi_series[-16:])
+                rsi_high_idx = np.argmax(rsi_series[-16:]) + len(rsi_series) - 16
+                if rsi_high_idx < len(rsi_series) - 4:  # RSI高点出现在至少4天前
+                    divergence_score = 0.3  # 顶背离，降低趋势可信度
+                    has_divergence = True
+        
+        if close_series is not None and macd_hist_series is not None and len(close_series) >= 16:
+            # 检测价格创新高但MACD未创新高的顶背离
+            recent_high = max(close_series[-16:])
+            high_idx = np.argmax(close_series[-16:]) + len(close_series) - 16
+            if high_idx == len(close_series) - 1:  # 当前价格是近16日高点
+                macd_high = max(macd_hist_series[-16:])
+                macd_high_idx = np.argmax(macd_hist_series[-16:]) + len(macd_hist_series) - 16
+                if macd_high_idx < len(macd_hist_series) - 4:  # MACD高点出现在至少4天前
+                    divergence_score = 0.3  # 顶背离，降低趋势可信度
+                    has_divergence = True
+        
+        scores['divergence_score'] = divergence_score
+        scores['has_divergence'] = has_divergence
 
         self.trend_scores = scores
 
@@ -311,7 +377,7 @@ class StockTechnicalTrendAnalyzer:
         # 定义指标方向信号：1=多头/看涨， -1=空头/看跌， 0=中性
         signals = []
 
-        # 均线方向
+        # 1. 均线方向
         ma5 = self.technical_indicators.get('MA5', 0)
         ma10 = self.technical_indicators.get('MA10', 0)
         ma20 = self.technical_indicators.get('MA20', 0)
@@ -322,7 +388,7 @@ class StockTechnicalTrendAnalyzer:
         else:
             signals.append(0)
 
-        # MACD 方向
+        # 2. MACD 方向
         macd_hist = self.technical_indicators.get('MACD_hist', 0)
         if macd_hist > 0:
             signals.append(1)
@@ -331,7 +397,7 @@ class StockTechnicalTrendAnalyzer:
         else:
             signals.append(0)
 
-        # RSI 方向 (超买区视为潜在回调，方向偏空；超卖区偏多)
+        # 3. RSI 方向 (超买区视为潜在回调，方向偏空；超卖区偏多)
         rsi = self.technical_indicators.get('RSI', 50)
         if rsi > 70:
             signals.append(-1)   # 超买，看回调
@@ -340,21 +406,62 @@ class StockTechnicalTrendAnalyzer:
         else:
             signals.append(0)
 
-        # ADX 趋势方向 (需要结合价格位置，简单使用收盘价相对于MA20)
+        # 4. ADX 趋势方向 (ADX<25视为无趋势，返回中性)
+        adx = self.technical_indicators.get('ADX', 20)
         close = self.technical_indicators.get('close', 0)
-        if close > ma20:
-            signals.append(1)
-        elif close < ma20:
-            signals.append(-1)
+        if adx >= 25:
+            if close > ma20:
+                signals.append(1)
+            elif close < ma20:
+                signals.append(-1)
+            else:
+                signals.append(0)
         else:
-            signals.append(0)
+            signals.append(0)  # ADX<25视为无趋势
 
-        # KDJ 方向 (K>D 为多头)
+        # 5. KDJ 方向 (K>D 为多头)
         k = self.technical_indicators.get('K', 50)
         d = self.technical_indicators.get('D', 50)
         if k > d:
             signals.append(1)
         elif k < d:
+            signals.append(-1)
+        else:
+            signals.append(0)
+
+        # 6. CCI 方向 (超买区偏空，超卖区偏多)
+        cci = self.technical_indicators.get('CCI', 0)
+        if cci > 100:
+            signals.append(-1)  # 超买，看回调
+        elif cci < -100:
+            signals.append(1)   # 超卖，看反弹
+        else:
+            signals.append(0)
+
+        # 7. MFI 方向 (超买区偏空，超卖区偏多)
+        mfi = self.technical_indicators.get('MFI', 50)
+        if mfi > 80:
+            signals.append(-1)  # 超买，资金流出风险
+        elif mfi < 20:
+            signals.append(1)   # 超卖，资金流入机会
+        else:
+            signals.append(0)
+
+        # 8. 布林带方向 (%B>0.7偏多，%B<0.3偏空)
+        bb_pctb = self.technical_indicators.get('BB_pctB', 0.5)
+        if bb_pctb > 0.7:
+            signals.append(1)
+        elif bb_pctb < 0.3:
+            signals.append(-1)
+        else:
+            signals.append(0)
+
+        # 9. VW_MACD 方向
+        vw_macd = self.technical_indicators.get('VW_MACD', 0)
+        vw_macd_hist = self.technical_indicators.get('VW_MACD_Hist', 0)
+        if vw_macd > 0 and vw_macd_hist > 0:
+            signals.append(1)
+        elif vw_macd < 0 and vw_macd_hist < 0:
             signals.append(-1)
         else:
             signals.append(0)
@@ -367,7 +474,21 @@ class StockTechnicalTrendAnalyzer:
             positive = sum(1 for s in non_zero if s > 0)
             negative = sum(1 for s in non_zero if s < 0)
             max_dir = max(positive, negative)
-            self.consistency_score = max_dir / len(non_zero)
+            # 计算基本一致性
+            basic_consistency = max_dir / len(non_zero)
+            
+            # 调整一致性评分，考虑多空信号混杂的情况
+            # 如果多空信号都存在，降低一致性评分
+            if positive > 0 and negative > 0:
+                # 计算信号强度差异
+                signal_diff = abs(positive - negative) / len(non_zero)
+                # 根据差异调整一致性评分
+                self.consistency_score = basic_consistency * (0.6 + 0.4 * signal_diff)
+            else:
+                self.consistency_score = basic_consistency
+        
+        # 限制一致性分数范围
+        self.consistency_score = max(0.0, min(1.0, self.consistency_score))
 
     def generate_trading_signal(self):
         """生成明确的交易信号 (BUY/SELL/HOLD) 及置信度"""
@@ -429,6 +550,52 @@ class StockTechnicalTrendAnalyzer:
         }
 
     # ==================== 原有分析方法（保持不变，但可增加数值化调用） ====================
+    def calculate_ema(self, data, period):
+        """计算指数移动平均线"""
+        return data.ewm(span=period, adjust=False).mean()
+
+    def calculate_ad_line(self, data):
+        """计算积累/派发线 (A/D Line)"""
+        high = data['high']
+        low = data['low']
+        close = data['close']
+        volume = data['volume']
+        
+        # 计算资金流量乘数（使用向量化操作）
+        high_low_diff = high - low
+        # 创建一个掩码，处理high_low_diff为0的情况
+        mask = high_low_diff != 0
+        money_flow_multiplier = pd.Series(0, index=data.index)
+        money_flow_multiplier[mask] = ((close[mask] - low[mask]) - (high[mask] - close[mask])) / high_low_diff[mask]
+        # 计算资金流量
+        money_flow_volume = money_flow_multiplier * volume
+        # 计算A/D线
+        ad_line = money_flow_volume.cumsum()
+        return ad_line
+
+    def calculate_chaikin_mf(self, data, period=20):
+        """计算柴金资金流量 (Chaikin Money Flow)"""
+        high = data['high']
+        low = data['low']
+        close = data['close']
+        volume = data['volume']
+        
+        # 计算典型价格
+        typical_price = (high + low + close) / 3
+        # 计算资金流量
+        money_flow = typical_price * volume
+        # 计算资金流量乘数（使用向量化操作）
+        high_low_diff = high - low
+        # 创建一个掩码，处理high_low_diff为0的情况
+        mask = high_low_diff != 0
+        money_flow_multiplier = pd.Series(0, index=data.index)
+        money_flow_multiplier[mask] = ((close[mask] - low[mask]) - (high[mask] - close[mask])) / high_low_diff[mask]
+        # 计算资金流量
+        money_flow_volume = money_flow_multiplier * volume
+        # 计算CMF
+        cmf = money_flow_volume.rolling(period).sum() / volume.rolling(period).sum()
+        return cmf
+
     def analyze_technical_indicators(self):
         """主控函数：从数据中提取最新指标并分析趋势"""
         if self.recent_data is None or len(self.recent_data) == 0:
@@ -466,6 +633,39 @@ class StockTechnicalTrendAnalyzer:
             'BB_pctB': round(latest.get('BB_pctB', 0), 4),
         }
 
+        # 计算并添加缺失的指标
+        if 'high' in self.data.columns and 'low' in self.data.columns and 'close' in self.data.columns and 'volume' in self.data.columns:
+            # 计算EMA
+            if 'close' in self.data.columns:
+                self.data['EMA5'] = self.calculate_ema(self.data['close'], 5)
+                self.data['EMA10'] = self.calculate_ema(self.data['close'], 10)
+                self.data['EMA20'] = self.calculate_ema(self.data['close'], 20)
+                self.technical_indicators['EMA5'] = round(self.data['EMA5'].iloc[-1], 2)
+                self.technical_indicators['EMA10'] = round(self.data['EMA10'].iloc[-1], 2)
+                self.technical_indicators['EMA20'] = round(self.data['EMA20'].iloc[-1], 2)
+            
+            # 计算A/D Line
+            ad_line = self.calculate_ad_line(self.data)
+            self.technical_indicators['AD_Line'] = round(ad_line.iloc[-1], 2)
+            
+            # 计算Chaikin Money Flow
+            cmf = self.calculate_chaikin_mf(self.data)
+            self.technical_indicators['Chaikin_MF'] = round(cmf.iloc[-1], 4)
+            
+            # 计算成交量加权MACD
+            if 'close' in self.data.columns and 'volume' in self.data.columns:
+                # 计算成交量加权价格
+                self.data['VWAP'] = (self.data['close'] * self.data['volume']).cumsum() / self.data['volume'].cumsum()
+                # 计算VWAP的MACD
+                exp1 = self.calculate_ema(self.data['VWAP'], 12)
+                exp2 = self.calculate_ema(self.data['VWAP'], 26)
+                vw_macd = exp1 - exp2
+                vw_signal = self.calculate_ema(vw_macd, 9)
+                vw_hist = vw_macd - vw_signal
+                self.technical_indicators['VW_MACD'] = round(vw_macd.iloc[-1], 4)
+                self.technical_indicators['VW_MACD_Signal'] = round(vw_signal.iloc[-1], 4)
+                self.technical_indicators['VW_MACD_Hist'] = round(vw_hist.iloc[-1], 4)
+
         # 分析各个指标的趋势
         self.analyze_ma_trend()
         self.analyze_macd_trend()
@@ -477,6 +677,7 @@ class StockTechnicalTrendAnalyzer:
         self.analyze_bollinger_trend()
         self.analyze_cci_trend()
         self.analyze_mfi_trend()
+        self.analyze_vw_macd_trend()
         self.analyze_support_resistance()
 
         # 检测信号矛盾
@@ -867,6 +1068,33 @@ class StockTechnicalTrendAnalyzer:
 
         self.indicator_trends['MFI'] = desc
 
+    def analyze_vw_macd_trend(self):
+        """分析成交量加权MACD趋势"""
+        # 从技术指标中获取VW_MACD值，而不是从原始数据列
+        vw_macd = self.technical_indicators.get('VW_MACD', 0)
+        vw_macd_signal = self.technical_indicators.get('VW_MACD_Signal', 0)
+        vw_macd_hist = self.technical_indicators.get('VW_MACD_Hist', 0)
+        
+        if vw_macd == 0 or vw_macd_signal == 0:
+            self.indicator_trends['VW_MACD'] = "数据不足"
+            return
+
+        desc = f"最新值: VW_MACD={vw_macd:.4f}, 柱状值={vw_macd_hist:.4f}"
+
+        # 金叉死叉判断
+        if vw_macd > vw_macd_signal:
+            desc += "，金叉状态，多头信号"
+        else:
+            desc += "，死叉状态，空头信号"
+
+        # 柱状图分析
+        if vw_macd_hist > 0:
+            desc += "，红柱，多头占优"
+        else:
+            desc += "，绿柱，空头占优"
+
+        self.indicator_trends['VW_MACD'] = desc
+
     def analyze_support_resistance(self):
         """计算支撑阻力（基于近期高低点和ATR）"""
         high = self._safe_series('high')
@@ -1055,6 +1283,21 @@ class StockTechnicalTrendAnalyzer:
         else:
             labels['Bollinger'] = "位于中轨附近，震荡"
         
+        # VW_MACD标签
+        vw_macd = self.technical_indicators.get('VW_MACD', 0)
+        vw_macd_signal = self.technical_indicators.get('VW_MACD_Signal', 0)
+        vw_macd_hist = self.technical_indicators.get('VW_MACD_Hist', 0)
+        if vw_macd > vw_macd_signal and vw_macd_hist > 0:
+            labels['VW_MACD'] = "金叉，红柱，多头占优"
+        elif vw_macd > vw_macd_signal and vw_macd_hist < 0:
+            labels['VW_MACD'] = "金叉，绿柱，信号矛盾"
+        elif vw_macd < vw_macd_signal and vw_macd_hist < 0:
+            labels['VW_MACD'] = "死叉，绿柱，空头占优"
+        elif vw_macd < vw_macd_signal and vw_macd_hist > 0:
+            labels['VW_MACD'] = "死叉，红柱，信号矛盾"
+        else:
+            labels['VW_MACD'] = "信号不明确"
+        
         return labels
 
     def compute_price_action(self):
@@ -1115,13 +1358,23 @@ class StockTechnicalTrendAnalyzer:
         market_snapshot = self.generate_market_snapshot()
         
         # 优化trend_scores为trend_confidence，并降低小数精度
+        # 确保has_divergence与multi_timeframe.divergence保持一致
+        has_divergence = self.trend_scores.get('has_divergence', False) or self.multi_timeframe.get('divergence', False)
+        
         trend_confidence = {
             'ma_bullish_alignment': round(self.trend_scores.get('ma_bullish_score', 0.5), 2),
             'macd_momentum_strength': round(self.trend_scores.get('macd_power', 0.5), 2),
             'adx_trend_presence': round(self.trend_scores.get('adx_trend_strength', 0.2), 2),
             'overbought_risk': round(abs(self.trend_scores.get('overbought_oversold', 0)), 2),
-            'volume_momentum': round(self.trend_scores.get('volume_flow', 0), 2)
+            'volume_momentum': round(self.trend_scores.get('volume_flow', 0), 2),
+            'price_momentum': round(self.trend_scores.get('price_momentum', 0.5), 2),
+            'divergence_score': round(self.trend_scores.get('divergence_score', 1.0), 2),
+            'has_divergence': has_divergence
         }
+        
+        # 确保divergence_score与has_divergence保持一致
+        if has_divergence and trend_confidence['divergence_score'] >= 0.5:
+            trend_confidence['divergence_score'] = 0.4  # 如果存在背离，将divergence_score设为低于0.5
         
         # 扩充trading_signal的reason
         if self.trading_signal.get('reason') == "中期走弱且短期超买":
@@ -1148,10 +1401,18 @@ class StockTechnicalTrendAnalyzer:
                 'field_notes': {
                     'Volume_Ratio': '当日成交量 / 过去5日均量（量比）',
                     'trend_confidence': '0~1，数值越大表示该维度信号越强',
+                    'ma_bullish_alignment': '0~1，均线多头排列强度，1表示完全多头排列',
+                    'macd_momentum_strength': '0~1，MACD动量强度，基于柱状图大小和趋势',
+                    'adx_trend_presence': '0~1，ADX趋势强度，基于ADX指标值归一化',
+                    'overbought_risk': '0~1，超买超卖风险，基于RSI指标',
+                    'volume_momentum': '0~1，成交量动量，基于量比和OBV变化',
+                    'price_momentum': '0~1，价格动量强度，基于价格变化率',
+                    'divergence_score': '0~1，指标背离程度，1表示无背离，低于0.5表示存在背离',
+                    'has_divergence': '布尔值，是否存在指标背离',
                     'BB_pctB': '价格在布林带中的位置，>1 突破上轨，<0 突破下轨',
                     'MFI': '资金流量指标，>80超买，<20超卖',
                     'ATR': '平均真实波幅，衡量价格波动幅度',
-                    'consistency_score': '0~1，各技术指标方向一致性的比例，1 表示完全一致（全看多或全看空）'
+                    'consistency_score': '0~1，各技术指标方向一致性的比例，1 表示完全一致（全看多或全看空），考虑了均线、MACD、RSI、ADX、KDJ、CCI、MFI、布林带等8个指标'
                 }
             },
             'technical_indicators': self.technical_indicators,

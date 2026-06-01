@@ -1,14 +1,14 @@
-
 # analyze_technical_trend.py
-# 功能：分析股票技术指标趋势，提供详细的趋势描述
+# 功能：基于technical_trend_analysis.json文件，使用Ollama AI进行专门的技术趋势分析
 # 实现原理：
-# 1. 加载本地股票数据文件
-# 2. 提取最近半个月或一个月的数据
-# 3. 分析关键技术指标的趋势变化
-# 4. 为每个指标生成趋势描述
-# 5. 生成综合分析报告
+# 1. 加载技术趋势分析JSON文件
+# 2. 提取关键技术指标和趋势数据
+# 3. 生成针对技术趋势的AI分析提示词
+# 4. 将提示词发送给本地部署的Ollama AI
+# 5. 接收AI分析结果并保存为markdown文件
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import json
 import os
@@ -17,496 +17,313 @@ import sys
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATA_DIR
+from config import DATA_DIR, AI_CONFIG, STRATEGY_PROMPTS
 
-class StockTechnicalTrendAnalyzer:
-    def __init__(self, file_path):
-        self.file_path = file_path
-        self.data = None
-        self.ticker = None
-        self.recent_data = None
-        self.technical_indicators = {}
-        self.indicator_trends = {}
-    
-    def load_data(self):
-        """加载数据"""
-        print(f"加载数据文件: {self.file_path}")
-        self.data = pd.read_csv(self.file_path)
-        
-        # 转换日期格式
-        if 'date' in self.data.columns:
-            self.data['date'] = pd.to_datetime(self.data['date'])
-            # 按日期排序
-            self.data = self.data.sort_values('date')
-        
-        # 获取股票代码
-        if 'ticker' in self.data.columns:
-            self.ticker = self.data['ticker'].iloc[0]
-        else:
-            # 从文件路径中提取股票代码
-            file_name = os.path.basename(self.file_path)
-            self.ticker = file_name.split('_')[0]
-        
-        # 获取最近30天的数据
-        if 'date' in self.data.columns:
-            # 计算30天前的日期
-            end_date = self.data['date'].iloc[-1]
-            start_date = end_date - timedelta(days=30)
-            self.recent_data = self.data[self.data['date'] >= start_date]
-        else:
-            # 如果没有日期列，取最近30行
-            self.recent_data = self.data.tail(30)
-        
-        print(f"加载了最近 {len(self.recent_data)} 条数据")
-        return self.data
-    
-    def analyze_technical_indicators(self):
-        """分析技术指标趋势"""
-        if self.recent_data is None:
-            print("数据未加载，无法分析技术指标")
-            return
-        
-        # 获取最新数据
-        latest = self.recent_data.iloc[-1]
-        
-        # 提取技术指标的最新值
-        self.technical_indicators = {
-            'MA5': round(latest.get('MA5', 0), 2),
-            'MA10': round(latest.get('MA10', 0), 2),
-            'MA20': round(latest.get('MA20', 0), 2),
-            'RSI': round(latest.get('RSI', 0), 2),
-            'DIF': round(latest.get('DIF', 0), 4),
-            'DEA': round(latest.get('DEA', 0), 4),
-            'KDJ_K': round(latest.get('K', 0), 2),
-            'KDJ_D': round(latest.get('D', 0), 2),
-            'KDJ_J': round(latest.get('J', 0), 2),
-            'ATR': round(latest.get('ATR', 0), 2),
-            'OBV': round(latest.get('OBV', 0), 2),
-            'ADX': round(latest.get('ADX', 0), 2),
-            'Volume': round(latest.get('volume', 0), 2)
+class TechnicalTrendLLMAnalyzer:
+    def __init__(self, ticker, strategy='trend_following'):
+        self.ticker = ticker
+        self.strategy = strategy
+        self.strategy_prompt_template = STRATEGY_PROMPTS.get(self.strategy, STRATEGY_PROMPTS['neutral'])
+        self.technical_trend_data = {}
+        self.stock_info = {
+            'name': '',
+            'industry': '',
+            'pe': '',
+            'pb': '',
+            'market_cap': '',
+            'main_business': ''
         }
-        
-        # 分析各指标的趋势
-        self.analyze_macd_trend()
-        self.analyze_rsi_trend()
-        self.analyze_kdj_trend()
-        self.analyze_ma_trend()
-        self.analyze_obv_trend()
-        self.analyze_adx_trend()
-        self.analyze_volume_trend()
-    
-    def analyze_macd_trend(self):
-        """分析MACD趋势"""
-        if 'DIF' not in self.recent_data.columns or 'DEA' not in self.recent_data.columns:
-            self.indicator_trends['MACD'] = "数据不足，无法分析趋势"
-            return
-        
-        # 直接使用已有的MACD柱状图
-        dif = self.recent_data['DIF'].values
-        dea = self.recent_data['DEA'].values
-        if 'MACD_hist' in self.recent_data.columns:
-            macd_hist = self.recent_data['MACD_hist'].values
-        else:
-            macd_hist = dif - dea
-        
-        # 分析趋势
-        latest_dif = dif[-1]
-        latest_macd_hist = macd_hist[-1]
-        
-        trend_description = f"最新值: {latest_macd_hist:.4f}"
-        
-        # 分析柱状图趋势
-        if len(macd_hist) >= 10:
-            recent_hist = macd_hist[-10:]
-            # 检查柱状图颜色变化
-            if all(hist > 0 for hist in recent_hist):
-                trend_description += "，近10天持续红柱，多头趋势"
-            elif all(hist < 0 for hist in recent_hist):
-                trend_description += "，近10天持续绿柱，空头趋势"
-            else:
-                # 检查最近的变化
-                if latest_macd_hist > 0 and recent_hist[-2] < 0:
-                    trend_description += "，最近由绿柱转为红柱，金叉形成"
-                elif latest_macd_hist < 0 and recent_hist[-2] > 0:
-                    trend_description += "，最近由红柱转为绿柱，死叉形成"
-            
-            # 检查柱状图大小变化（更详细的分析）
-            if len(recent_hist) >= 8:
-                # 分为前4天和后4天，比较变化趋势
-                first_half = recent_hist[:4]
-                second_half = recent_hist[4:]
-                
-                # 计算平均柱状图大小
-                first_half_avg = np.mean(np.abs(first_half))
-                second_half_avg = np.mean(np.abs(second_half))
-                
-                # 分析变化趋势
-                if second_half_avg > first_half_avg * 1.2:
-                    if latest_macd_hist > 0:
-                        trend_description += "，红柱逐渐增大，多头力量持续增强"
-                    else:
-                        trend_description += "，绿柱逐渐增大，空头力量持续增强"
-                elif second_half_avg < first_half_avg * 0.8:
-                    if latest_macd_hist > 0:
-                        trend_description += "，红柱逐渐减小，多头力量逐渐减弱"
-                    else:
-                        trend_description += "，绿柱逐渐减小，空头力量逐渐减弱"
-                else:
-                    if latest_macd_hist > 0:
-                        trend_description += "，红柱大小相对稳定，多头力量保持"
-                    else:
-                        trend_description += "，绿柱大小相对稳定，空头力量保持"
-        
-        self.indicator_trends['MACD'] = trend_description
-    
-    def analyze_rsi_trend(self):
-        """分析RSI趋势"""
-        if 'RSI' not in self.recent_data.columns:
-            self.indicator_trends['RSI'] = "数据不足，无法分析趋势"
-            return
-        
-        rsi = self.recent_data['RSI'].values
-        latest_rsi = rsi[-1]
-        
-        trend_description = f"最新值: {latest_rsi:.2f}"
-        
-        # 分析超买超卖状态
-        if latest_rsi > 70:
-            trend_description += "，处于超买区域，可能回调"
-        elif latest_rsi < 30:
-            trend_description += "，处于超卖区域，可能反弹"
-        else:
-            trend_description += "，处于正常区域"
-        
-        # 分析趋势变化（更详细）
-        if len(rsi) >= 10:
-            recent_rsi = rsi[-10:]
-            # 分为前5天和后5天，比较变化趋势
-            first_half = recent_rsi[:5]
-            second_half = recent_rsi[5:]
-            
-            # 计算平均值
-            first_half_avg = np.mean(first_half)
-            second_half_avg = np.mean(second_half)
-            
-            # 分析变化趋势
-            if second_half_avg > first_half_avg * 1.1:
-                trend_description += "，近10天RSI持续上升，上涨动能增强"
-            elif second_half_avg < first_half_avg * 0.9:
-                trend_description += "，近10天RSI持续下降，下跌动能增强"
-            else:
-                trend_description += "，近10天RSI相对稳定，动能平衡"
-        
-        self.indicator_trends['RSI'] = trend_description
-    
-    def analyze_kdj_trend(self):
-        """分析KDJ趋势"""
-        if 'K' not in self.recent_data.columns or 'D' not in self.recent_data.columns:
-            self.indicator_trends['KDJ'] = "数据不足，无法分析趋势"
-            return
-        
-        k = self.recent_data['K'].values
-        d = self.recent_data['D'].values
-        latest_k = k[-1]
-        latest_d = d[-1]
-        
-        trend_description = f"最新值: K={latest_k:.2f}, D={latest_d:.2f}"
-        
-        # 分析金叉死叉
-        if len(k) >= 2:
-            if latest_k > latest_d and k[-2] <= d[-2]:
-                trend_description += "，最近形成金叉，买入信号"
-            elif latest_k < latest_d and k[-2] >= d[-2]:
-                trend_description += "，最近形成死叉，卖出信号"
-        
-        # 分析超买超卖
-        if latest_k > 80 or latest_d > 80:
-            trend_description += "，处于超买区域"
-        elif latest_k < 20 or latest_d < 20:
-            trend_description += "，处于超卖区域"
-        
-        # 分析KDJ趋势变化（更详细）
-        if len(k) >= 8:
-            # 分为前4天和后4天，比较变化趋势
-            k_first_half = k[:4]
-            k_second_half = k[4:]
-            d_first_half = d[:4]
-            d_second_half = d[4:]
-            
-            # 计算平均值
-            k_first_avg = np.mean(k_first_half)
-            k_second_avg = np.mean(k_second_half)
-            d_first_avg = np.mean(d_first_half)
-            d_second_avg = np.mean(d_second_half)
-            
-            # 分析K值趋势
-            if k_second_avg > k_first_avg * 1.1:
-                trend_description += "，K值持续上升，短期动能增强"
-            elif k_second_avg < k_first_avg * 0.9:
-                trend_description += "，K值持续下降，短期动能减弱"
-            
-            # 分析D值趋势
-            if d_second_avg > d_first_avg * 1.1:
-                trend_description += "，D值持续上升，中期趋势转强"
-            elif d_second_avg < d_first_avg * 0.9:
-                trend_description += "，D值持续下降，中期趋势转弱"
-        
-        self.indicator_trends['KDJ'] = trend_description
-    
-    def analyze_ma_trend(self):
-        """分析移动平均线趋势"""
-        has_ma5 = 'MA5' in self.recent_data.columns
-        has_ma10 = 'MA10' in self.recent_data.columns
-        has_ma20 = 'MA20' in self.recent_data.columns
-        
-        if not (has_ma5 and has_ma10 and has_ma20):
-            self.indicator_trends['MA'] = "数据不足，无法分析趋势"
-            return
-        
-        ma5 = self.recent_data['MA5'].values
-        ma10 = self.recent_data['MA10'].values
-        ma20 = self.recent_data['MA20'].values
-        latest_ma5 = ma5[-1]
-        latest_ma10 = ma10[-1]
-        latest_ma20 = ma20[-1]
-        
-        trend_description = f"最新值: MA5={latest_ma5:.2f}, MA10={latest_ma10:.2f}, MA20={latest_ma20:.2f}"
-        
-        # 分析均线排列
-        if latest_ma5 > latest_ma10 > latest_ma20:
-            trend_description += "，呈多头排列，上涨趋势"
-        elif latest_ma5 < latest_ma10 < latest_ma20:
-            trend_description += "，呈空头排列，下跌趋势"
-        else:
-            trend_description += "，呈混乱排列，震荡趋势"
-        
-        # 分析短期均线与长期均线的关系
-        if latest_ma5 > latest_ma20:
-            trend_description += "，短期均线在长期均线上方"
-        else:
-            trend_description += "，短期均线在长期均线下方"
-        
-        # 分析均线趋势变化（更详细）
-        if len(ma5) >= 10:
-            # 分析MA5的变化趋势
-            ma5_recent = ma5[-10:]
-            ma5_slope = (ma5_recent[-1] - ma5_recent[0]) / ma5_recent[0]
-            
-            # 分析MA10的变化趋势
-            ma10_recent = ma10[-10:]
-            ma10_slope = (ma10_recent[-1] - ma10_recent[0]) / ma10_recent[0]
-            
-            # 分析MA20的变化趋势
-            ma20_recent = ma20[-10:]
-            ma20_slope = (ma20_recent[-1] - ma20_recent[0]) / ma20_recent[0]
-            
-            # 分析短期均线变化
-            if ma5_slope > 0.02:
-                trend_description += "，MA5快速上升，短期动能强劲"
-            elif ma5_slope > 0:
-                trend_description += "，MA5缓慢上升，短期动能温和"
-            elif ma5_slope < -0.02:
-                trend_description += "，MA5快速下降，短期动能疲软"
-            elif ma5_slope < 0:
-                trend_description += "，MA5缓慢下降，短期动能减弱"
-            
-            # 分析中长期均线变化
-            if ma20_slope > 0.01:
-                trend_description += "，MA20持续上升，长期趋势向好"
-            elif ma20_slope > 0:
-                trend_description += "，MA20缓慢上升，长期趋势稳定"
-            elif ma20_slope < -0.01:
-                trend_description += "，MA20持续下降，长期趋势走弱"
-            elif ma20_slope < 0:
-                trend_description += "，MA20缓慢下降，长期趋势转弱"
-        
-        self.indicator_trends['MA'] = trend_description
-    
-    def analyze_obv_trend(self):
-        """分析OBV趋势"""
-        if 'OBV' not in self.recent_data.columns:
-            self.indicator_trends['OBV'] = "数据不足，无法分析趋势"
-            return
-        
-        obv = self.recent_data['OBV'].values
-        latest_obv = obv[-1]
-        
-        trend_description = f"最新值: {latest_obv:.2f}"
-        
-        # 分析OBV趋势
-        if len(obv) >= 10:
-            recent_obv = obv[-10:]
-            # 检查趋势方向
-            if recent_obv[-1] > recent_obv[0]:
-                trend_description += "，近10天OBV呈上升趋势，资金流入"
-            else:
-                trend_description += "，近10天OBV呈下降趋势，资金流出"
-            
-            # 分析OBV变化强度
-            obv_change = (recent_obv[-1] - recent_obv[0]) / abs(recent_obv[0])
-            if abs(obv_change) > 0.1:
-                if obv_change > 0:
-                    trend_description += "，资金流入强度较大"
-                else:
-                    trend_description += "，资金流出强度较大"
-            elif abs(obv_change) > 0.05:
-                if obv_change > 0:
-                    trend_description += "，资金流入强度中等"
-                else:
-                    trend_description += "，资金流出强度中等"
-            else:
-                trend_description += "，资金流入/流出强度较小"
-            
-            # 分析OBV与价格的关系
-            if 'close' in self.recent_data.columns:
-                close = self.recent_data['close'].values[-10:]
-                price_change = (close[-1] - close[0]) / close[0]
-                if obv_change > 0 and price_change > 0:
-                    trend_description += "，价量配合良好，上涨动能充足"
-                elif obv_change < 0 and price_change < 0:
-                    trend_description += "，价量配合良好，下跌动能充足"
-                elif obv_change > 0 and price_change < 0:
-                    trend_description += "，量价背离，可能反弹"
-                elif obv_change < 0 and price_change > 0:
-                    trend_description += "，量价背离，可能回调"
-        
-        self.indicator_trends['OBV'] = trend_description
-    
-    def analyze_adx_trend(self):
-        """分析ADX趋势"""
-        if 'ADX' not in self.recent_data.columns:
-            self.indicator_trends['ADX'] = "数据不足，无法分析趋势"
-            return
-        
-        adx = self.recent_data['ADX'].values
-        latest_adx = adx[-1]
-        
-        trend_description = f"最新值: {latest_adx:.2f}"
-        
-        # 分析趋势强度
-        if latest_adx > 50:
-            trend_description += "，趋势强度极强"
-        elif latest_adx > 40:
-            trend_description += "，趋势强度强"
-        elif latest_adx > 30:
-            trend_description += "，趋势强度中等"
-        elif latest_adx > 20:
-            trend_description += "，趋势强度弱"
-        else:
-            trend_description += "，无明显趋势"
-        
-        # 分析趋势变化（更详细）
-        if len(adx) >= 10:
-            recent_adx = adx[-10:]
-            # 分为前5天和后5天，比较变化趋势
-            first_half = recent_adx[:5]
-            second_half = recent_adx[5:]
-            
-            # 计算平均值
-            first_half_avg = np.mean(first_half)
-            second_half_avg = np.mean(second_half)
-            
-            # 分析变化趋势
-            if second_half_avg > first_half_avg * 1.2:
-                trend_description += "，近10天趋势强度明显增强"
-            elif second_half_avg > first_half_avg * 1.1:
-                trend_description += "，近10天趋势强度有所增强"
-            elif second_half_avg < first_half_avg * 0.8:
-                trend_description += "，近10天趋势强度明显减弱"
-            elif second_half_avg < first_half_avg * 0.9:
-                trend_description += "，近10天趋势强度有所减弱"
-            else:
-                trend_description += "，近10天趋势强度相对稳定"
-            
-            # 分析ADX的具体走势
-            if all(adx[i] < adx[i+1] for i in range(len(recent_adx)-1)):
-                trend_description += "，ADX持续上升，趋势正在形成"
-            elif all(adx[i] > adx[i+1] for i in range(len(recent_adx)-1)):
-                trend_description += "，ADX持续下降，趋势正在减弱"
-        
-        self.indicator_trends['ADX'] = trend_description
-    
-    def analyze_volume_trend(self):
-        """分析成交量趋势"""
-        volume_col = None
-        for col in ['volume', 'Volume', '成交量']:
-            if col in self.recent_data.columns:
-                volume_col = col
-                break
-        
-        if volume_col is None:
-            self.indicator_trends['Volume'] = "数据不足，无法分析趋势"
-            return
-        
-        volume = self.recent_data[volume_col].values
-        latest_volume = volume[-1]
-        
-        trend_description = f"最新值: {latest_volume:.2f}"
-        
-        # 分析成交量趋势
-        if len(volume) >= 10:
-            recent_volume = volume[-10:]
-            avg_volume = np.mean(recent_volume)
-            
-            # 分析当前成交量相对于平均值的变化
-            if latest_volume > avg_volume * 2:
-                trend_description += "，成交量急剧放大"
-            elif latest_volume > avg_volume * 1.5:
-                trend_description += "，成交量明显放大"
-            elif latest_volume > avg_volume * 1.2:
-                trend_description += "，成交量有所放大"
-            elif latest_volume < avg_volume * 0.3:
-                trend_description += "，成交量极度萎缩"
-            elif latest_volume < avg_volume * 0.5:
-                trend_description += "，成交量明显缩小"
-            elif latest_volume < avg_volume * 0.8:
-                trend_description += "，成交量有所缩小"
-            else:
-                trend_description += "，成交量相对稳定"
-            
-            # 分析成交量的变化趋势
-            first_half = recent_volume[:5]
-            second_half = recent_volume[5:]
-            first_half_avg = np.mean(first_half)
-            second_half_avg = np.mean(second_half)
-            
-            if second_half_avg > first_half_avg * 1.5:
-                trend_description += "，近10天成交量呈明显上升趋势"
-            elif second_half_avg > first_half_avg * 1.2:
-                trend_description += "，近10天成交量呈上升趋势"
-            elif second_half_avg < first_half_avg * 0.5:
-                trend_description += "，近10天成交量呈明显下降趋势"
-            elif second_half_avg < first_half_avg * 0.8:
-                trend_description += "，近10天成交量呈下降趋势"
-            else:
-                trend_description += "，近10天成交量相对稳定"
-            
-            # 分析成交量的波动情况
-            volume_std = np.std(recent_volume)
-            volume_cv = volume_std / avg_volume
-            if volume_cv > 0.5:
-                trend_description += "，成交量波动较大"
-            elif volume_cv > 0.3:
-                trend_description += "，成交量波动中等"
-            else:
-                trend_description += "，成交量波动较小"
-        
-        self.indicator_trends['Volume'] = trend_description
-    
-    def generate_trend_report(self):
-        """生成趋势分析报告"""
-        report = {
-            'ticker': self.ticker,
-            'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'technical_indicators': self.technical_indicators,
-            'indicator_trends': self.indicator_trends,
-            'recent_data_count': len(self.recent_data)
+        self.trading_records = []
+        self.position = {
+            'total_shares': 0,
+            'total_cost': 0,
+            'avg_cost': 0,
+            'buy_operations': 0,
+            'sell_operations': 0
         }
-        
-        return report
     
-    def save_report(self, report):
-        """保存分析报告"""
+    def load_technical_trend_data(self):
+        """加载技术趋势分析JSON文件"""
+        stock_dir = os.path.join(DATA_DIR, self.ticker)
+        trend_file = os.path.join(stock_dir, f"{self.ticker}_technical_trend_analysis.json")
+        
+        if os.path.exists(trend_file):
+            print(f"加载技术趋势分析文件: {trend_file}")
+            with open(trend_file, 'r', encoding='utf-8') as f:
+                self.technical_trend_data = json.load(f)
+        else:
+            print(f"技术趋势分析文件不存在: {trend_file}")
+            return False
+        
+        return True
+    
+    def load_trading_records(self):
+        """加载交易记录并计算持仓情况"""
+        try:
+            from trading_records import TRADING_RECORDS
+            
+            self.trading_records = TRADING_RECORDS.get(self.ticker, [])
+            self.position = self.calculate_position()
+            
+            print(f"加载交易记录: 共 {len(self.trading_records)} 条记录")
+            print(f"当前持仓: {self.position['total_shares']} 股, 平均成本: {self.position['avg_cost']:.2f} 元")
+            
+        except Exception as e:
+            print(f"加载交易记录时出错: {str(e)}")
+    
+    def calculate_position(self):
+        """计算当前持仓情况"""
+        total_shares = 0
+        total_cost = 0
+        buy_operations = 0
+        sell_operations = 0
+        
+        for operation in self.trading_records:
+            if operation['type'] == 'buy':
+                total_shares += operation['shares']
+                total_cost += operation['price'] * operation['shares']
+                buy_operations += 1
+            elif operation['type'] == 'sell':
+                total_shares -= operation['shares']
+                total_cost -= operation['price'] * operation['shares']
+                sell_operations += 1
+        
+        avg_cost = 0
+        if total_shares > 0:
+            avg_cost = total_cost / total_shares
+        
+        return {
+            'total_shares': total_shares,
+            'total_cost': total_cost,
+            'avg_cost': avg_cost,
+            'buy_operations': buy_operations,
+            'sell_operations': sell_operations
+        }
+    
+    def calculate_fifo_position(self):
+        """按照先进先出逻辑计算最终剩余持仓"""
+        # 用于存储买入批次的列表，每个批次包含价格、数量和日期
+        buy_batches = []
+        
+        # 处理每笔交易
+        for operation in self.trading_records:
+            if operation['type'] == 'buy':
+                # 添加买入批次
+                buy_batches.append({
+                    'date': operation['date'],
+                    'price': operation['price'],
+                    'shares': operation['shares']
+                })
+            elif operation['type'] == 'sell':
+                # 卖出时按照先进先出原则
+                shares_to_sell = operation['shares']
+                while shares_to_sell > 0 and buy_batches:
+                    # 取出最早的买入批次
+                    earliest_batch = buy_batches[0]
+                    if earliest_batch['shares'] > shares_to_sell:
+                        # 卖出部分批次
+                        earliest_batch['shares'] -= shares_to_sell
+                        shares_to_sell = 0
+                    else:
+                        # 卖出整个批次
+                        shares_to_sell -= earliest_batch['shares']
+                        buy_batches.pop(0)
+        
+        # 计算剩余持仓
+        remaining_shares = sum(batch['shares'] for batch in buy_batches)
+        total_cost = sum(batch['price'] * batch['shares'] for batch in buy_batches)
+        avg_cost = total_cost / remaining_shares if remaining_shares > 0 else 0
+        
+        return {
+            'remaining_batches': buy_batches,
+            'total_shares': remaining_shares,
+            'total_cost': total_cost,
+            'avg_cost': avg_cost
+        }
+    
+    def get_stock_info(self):
+        """从company_basic.json文件中获取股票基本信息"""
+        try:
+            # 构建固定的公司信息文件路径
+            stock_dir = os.path.join(DATA_DIR, self.ticker)
+            info_file = os.path.join(stock_dir, f"{self.ticker}_company_basic.json")
+            
+            # 检查文件是否存在
+            if not os.path.exists(info_file):
+                print(f"公司信息文件不存在: {info_file}")
+                return
+            
+            print(f"从文件加载公司基本信息: {info_file}")
+            
+            # 读取文件
+            with open(info_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 提取公司基本信息
+            if 'basic_info' in data:
+                basic_info = data['basic_info']
+                # 映射字段
+                self.stock_info['name'] = basic_info.get('公司简称', '')
+                self.stock_info['industry'] = basic_info.get('板块名称层级', '')
+                self.stock_info['main_business'] = basic_info.get('主营业务', '')
+            
+            # 从CSV文件中读取估值信息
+            valuation_file = os.path.join(stock_dir, f"{self.ticker}_valuation.csv")
+            if os.path.exists(valuation_file):
+                try:
+                    import pandas as pd
+                    df = pd.read_csv(valuation_file)
+                    if not df.empty:
+                        # 获取最新的估值数据
+                        latest_valuation = df.iloc[0].to_dict()
+                        # 尝试不同的字段名
+                        self.stock_info['pe'] = latest_valuation.get('市盈率(TTM)', latest_valuation.get('pe_ttm', ''))
+                        self.stock_info['pb'] = latest_valuation.get('市净率', latest_valuation.get('pb', ''))
+                        self.stock_info['market_cap'] = latest_valuation.get('总市值', '')
+                        print(f"成功从CSV文件加载估值信息: {valuation_file}")
+                except Exception as e:
+                    print(f"读取估值CSV文件时出错: {str(e)}")
+            
+            print("成功从文件加载公司基本信息")
+            print(f"加载的基本信息: {self.stock_info}")
+            
+        except Exception as e:
+            print(f"从文件获取股票基本信息时出错: {str(e)}")
+    
+    def generate_ai_prompt(self):
+        """生成针对技术趋势的AI分析提示词"""
+        if not self.technical_trend_data:
+            return "技术趋势数据未加载"
+        
+        prompt = f"""你是一位专业的金融分析师，擅长股票技术分析和投资建议。请基于以下技术趋势分析数据和交易记录，{self.strategy_prompt_template}，提供详细的技术分析和操作建议：
+
+=== 股票基本信息 ===
+- 股票代码: {self.ticker}
+- 股票名称: {self.stock_info.get('name', '未知')}
+- 所属行业: {self.stock_info.get('industry', '未知')}
+- 主营业务: {self.stock_info.get('main_business', '未知')}
+- 市盈率: {self.stock_info.get('pe', '未知')}
+- 市净率: {self.stock_info.get('pb', '未知')}
+- 总市值: {self.stock_info.get('market_cap', '未知')}
+
+=== 技术趋势分析数据 ===
+"""
+        
+        # 添加技术指标数据
+        if 'technical_indicators' in self.technical_trend_data:
+            ti = self.technical_trend_data['technical_indicators']
+            prompt += "### 技术指标最新值\n"
+            for key, value in ti.items():
+                prompt += f"- {key}: {value}\n"
+        
+        # 添加指标趋势
+        if 'indicator_trends' in self.technical_trend_data:
+            it = self.technical_trend_data['indicator_trends']
+            prompt += "\n### 指标趋势分析\n"
+            for key, value in it.items():
+                prompt += f"- {key}: {value}\n"
+        
+        # 添加趋势信心度
+        if 'trend_confidence' in self.technical_trend_data:
+            tc = self.technical_trend_data['trend_confidence']
+            prompt += "\n### 趋势信心度\n"
+            for key, value in tc.items():
+                prompt += f"- {key}: {value}\n"
+        
+        # 添加交易信号
+        if 'trading_signal' in self.technical_trend_data:
+            ts = self.technical_trend_data['trading_signal']
+            prompt += "\n### 交易信号\n"
+            prompt += f"- 操作: {ts.get('action', 'N/A')}\n"
+            prompt += f"- 信心度: {ts.get('confidence', 'N/A')}\n"
+            prompt += f"- 理由: {ts.get('reason', 'N/A')}\n"
+        
+        # 添加多周期趋势
+        if 'multi_timeframe' in self.technical_trend_data:
+            mt = self.technical_trend_data['multi_timeframe']
+            prompt += "\n### 多周期趋势\n"
+            prompt += f"- 周线趋势: {mt.get('weekly_trend', 'N/A')}\n"
+            prompt += f"- 日线趋势: {mt.get('daily_trend', 'N/A')}\n"
+            prompt += f"- 背离: {mt.get('divergence', 'N/A')}\n"
+        
+        # 添加一致性评分
+        if 'consistency_score' in self.technical_trend_data:
+            prompt += f"\n### 指标一致性评分\n"
+            prompt += f"- {self.technical_trend_data['consistency_score']}\n"
+        
+        # 添加市场快照
+        if 'market_snapshot' in self.technical_trend_data:
+            prompt += f"\n### 市场快照\n"
+            prompt += f"- {self.technical_trend_data['market_snapshot']}\n"
+        
+        # 添加交易记录和持仓情况
+        if self.position['total_shares'] > 0:
+            # 使用先进先出逻辑计算最终剩余持仓
+            fifo_position = self.calculate_fifo_position()
+            
+            prompt += f"\n=== 交易记录与持仓情况 ===\n"
+            prompt += f"- 当前持仓数量: {fifo_position['total_shares']} 股\n"
+            prompt += f"- 平均持仓成本: {fifo_position['avg_cost']:.2f} 元\n"
+            prompt += f"- 买入操作: {self.position['buy_operations']} 次\n"
+            prompt += f"- 卖出操作: {self.position['sell_operations']} 次\n"
+            
+            # 添加最终剩余持仓记录（先进先出计算结果）
+            if fifo_position['remaining_batches']:
+                prompt += "\n最终剩余持仓（先进先出计算）:\n"
+                for i, batch in enumerate(fifo_position['remaining_batches']):
+                    prompt += f"- 批次{i+1}: {batch['shares']} 股 @ {batch['price']} 元 (日期: {batch['date']})\n"
+                prompt += f"- 总计: {fifo_position['total_shares']} 股\n"
+                prompt += f"- 平均成本: {fifo_position['avg_cost']:.2f} 元\n"
+        
+        # 添加分析要求
+        prompt += """\n=== 分析要求 ===
+【趋势定性】
+- 主趋势方向：牛市/熊市/震荡
+- 趋势强度：强/中/弱/无（基于ADX和均线排列）
+- 多周期共振：周线与日线是否一致
+
+【多空信号表】
+| 类型 | 信号 | 指标依据（含具体数值） |
+|------|------|----------------------|
+| 看多 | (最多3个) | ... |
+| 看空 | (最多3个) | ... |
+
+【关键价位】
+- 强支撑1：xx（来源：布林下轨/ATR通道/近期低点）
+- 强支撑2：xx
+- 强阻力1：xx（来源：MA20/布林中轨/近期高点）
+- 强阻力2：xx
+
+【风险与仓位管理】
+- 波动风险：高/中/低（基于20日波动率及ATR%）
+- 回撤风险：当前20日最大回撤XX%，处于历史（高/中/低）水平
+- 资金流向：正向/负向/中性（基于Chaikin_MF / MFI / OBV）
+- 持仓建议：若已有持仓，应（持有/减仓/加仓/止损），理由...；若无持仓，应（观望/轻仓试探/等突破）
+
+【止损和止盈】
+基于以上每笔交易的持仓成本、当前价格、ATR波动率及技术支撑阻力位，请分别给出：
+1. **逐笔止损建议**：对每一笔买入记录，推荐一个止损价格，并说明理由。若某笔已浮盈，可建议移动止损。
+2. **整体止盈策略**：若股价上涨，建议采用哪种止盈方式（如：目标价位止盈、移动ATR止盈、分批止盈），并给出具体参数（如：从最高点回撤2倍ATR止盈）。
+3. **动态调整条件**：如果后续股价突破某个关键位置（如MA20或布林中轨），止损止盈应如何调整？请给出具体触发条件和调整后的数值。
+
+【具体交易策略】
+- 行动：买入 / 卖出 / 持有 / 观望
+- 置信度：0-100%
+- 若买入：建议价位区间____，仓位____%（占总资金）
+- 若卖出：止损价____，或止盈目标____
+- 若持有：关键观察条件（例如突破中轨且放量），及持仓的止损价____，或止盈目标____
+
+【核心逻辑一句话】
+
+请提供详细、专业的分析，基于数据和技术指标，考虑当前持仓情况，避免泛泛而谈。"""
+        
+        # 保存完整提示词到本地
+        self.save_prompt_to_local(prompt)
+        
+        return prompt
+    
+    def save_prompt_to_local(self, prompt):
+        """将完整提示词保存到本地文件"""
         # 确保数据目录存在
         stock_dir = os.path.join(DATA_DIR, self.ticker)
         if not os.path.exists(DATA_DIR):
@@ -514,67 +331,200 @@ class StockTechnicalTrendAnalyzer:
         if not os.path.exists(stock_dir):
             os.makedirs(stock_dir)
         
-        # 生成固定文件名，去掉时间戳
-        filename = f"{self.ticker}_technical_trend_analysis.json"
+        # 生成文件名：股票代码+时间戳+_prompt
+        timestamp = datetime.now().strftime('%Y%m%d')
+        filename = f"{self.ticker}_technical_trend_prompt_{timestamp}.txt"
         file_path = os.path.join(stock_dir, filename)
         
-        # 保存为JSON文件，直接覆盖
+        # 保存提示词到文件
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+            f.write(prompt)
         
-        print(f"趋势分析报告已保存为: {file_path}")
+        print(f"完整提示词已保存为: {file_path}")
         return file_path
     
-    def print_report(self, report):
-        """打印分析报告"""
-        print(f"\n=== 股票技术指标趋势分析报告 ===")
-        print(f"股票代码: {report['ticker']}")
-        print(f"分析日期: {report['analysis_date']}")
-        print(f"分析数据条数: {report['recent_data_count']}")
+    def get_ai_analysis(self, prompt):
+        """获取本地Ollama AI分析结果"""
+        try:
+            import ollama
+            
+            # 使用配置文件中的AI模型配置
+            model = AI_CONFIG['model']
+            temperature = AI_CONFIG['temperature']
+            max_tokens = AI_CONFIG['max_tokens']
+            
+            print(f"正在请求本地Ollama AI ({model})...")
+            # 配置Ollama客户端使用localhost
+            client = ollama.Client(host=AI_CONFIG['base_url'])
+            
+            response = client.chat(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "你是一位专业的金融分析师，擅长股票技术分析和投资建议。"},
+                    {"role": "user", "content": prompt}
+                ],
+                options={
+                    "temperature": temperature,  # 降低随机性，提高准确性
+                    "num_predict": max_tokens  # 足够的响应长度
+                }
+            )
+            
+            return response['message']['content']
+        except Exception as e:
+            print(f"调用本地Ollama AI时出错: {str(e)}")
+            # 返回默认分析结果
+            return "无法获取AI分析，请检查Ollama服务是否正常运行。"
+    
+    def save_analysis_to_md(self, analysis_content):
+        """将分析结果保存为markdown文件"""
+        # 确保数据目录存在
+        stock_dir = os.path.join(DATA_DIR, self.ticker)
+        if not os.path.exists(DATA_DIR):
+            os.makedirs(DATA_DIR)
+        if not os.path.exists(stock_dir):
+            os.makedirs(stock_dir)
         
-        print("\n=== 技术指标最新值 ===")
-        for indicator, value in report['technical_indicators'].items():
-            print(f"{indicator}: {value}")
+        # 生成文件名：股票代码+时间戳
+        timestamp = datetime.now().strftime('%Y%m%d')
+        filename = f"{self.ticker}_technical_trend_llm_analysis_{timestamp}.md"
+        file_path = os.path.join(stock_dir, filename)
         
-        print("\n=== 技术指标趋势分析 ===")
-        for indicator, trend in report['indicator_trends'].items():
-            print(f"{indicator}: {trend}")
+        # 从技术趋势分析JSON文件中获取数据
+        current_price = 0
+        analysis_date = datetime.now().strftime('%Y-%m-%d')
+        technical_indicators = {}
+        
+        if self.technical_trend_data:
+            # 获取当前价格
+            if 'technical_indicators' in self.technical_trend_data:
+                ti = self.technical_trend_data['technical_indicators']
+                current_price = ti.get('close', 0)
+                # 构建技术指标字典
+                technical_indicators = {
+                    'MA5': round(ti.get('MA5', 0), 2),
+                    'MA10': round(ti.get('MA10', 0), 2),
+                    'MA20': round(ti.get('MA20', 0), 2),
+                    'RSI': round(ti.get('RSI', 0), 2),
+                    'DIF': round(ti.get('DIF', 0), 4),
+                    'DEA': round(ti.get('DEA', 0), 4),
+                    'KDJ_K': round(ti.get('K', 0), 2),
+                    'KDJ_D': round(ti.get('D', 0), 2),
+                    'KDJ_J': round(ti.get('J', 0), 2),
+                    'ATR': round(ti.get('ATR', 0), 2),
+                    'OBV': round(ti.get('OBV', 0), 2),
+                    'ADX': round(ti.get('ADX', 0), 2)
+                }
+            # 获取分析日期
+            if 'meta' in self.technical_trend_data:
+                analysis_date = self.technical_trend_data['meta'].get('last_data_date', analysis_date)
+        
+        # 构建markdown内容
+        md_content = f"""# {self.stock_info.get('name', self.ticker)} ({self.ticker}) 技术趋势LLM分析报告
+
+## 分析时间
+{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 股票基本信息
+- 股票代码: {self.ticker}
+- 股票名称: {self.stock_info.get('name', '未知')}
+- 所属行业: {self.stock_info.get('industry', '未知')}
+- 当前价格: {current_price:.2f} 元
+- 分析基准日期: {analysis_date}
+
+## 技术指标数据
+"""
+        
+        for indicator, value in technical_indicators.items():
+            md_content += f"- {indicator}: {value}\n"
+        
+        # 添加技术趋势分析摘要
+        if self.technical_trend_data:
+            md_content += "\n## 技术趋势分析摘要\n"
+            if 'market_snapshot' in self.technical_trend_data:
+                md_content += f"- {self.technical_trend_data['market_snapshot']}\n"
+            if 'consistency_score' in self.technical_trend_data:
+                md_content += f"- 指标一致性评分: {self.technical_trend_data['consistency_score']}\n"
+            if 'trading_signal' in self.technical_trend_data:
+                ts = self.technical_trend_data['trading_signal']
+                md_content += f"- 交易信号: {ts.get('action', 'N/A')} (信心度: {ts.get('confidence', 'N/A')})\n"
+        
+        # 添加交易记录和持仓情况
+        if self.position['total_shares'] > 0:
+            # 使用先进先出逻辑计算最终剩余持仓
+            fifo_position = self.calculate_fifo_position()
+            
+            md_content += "\n## 交易记录与持仓情况\n"
+            md_content += f"- 当前持仓数量: {fifo_position['total_shares']} 股\n"
+            md_content += f"- 平均持仓成本: {fifo_position['avg_cost']:.2f} 元\n"
+            md_content += f"- 买入操作: {self.position['buy_operations']} 次\n"
+            md_content += f"- 卖出操作: {self.position['sell_operations']} 次\n"
+            
+            # 添加最终剩余持仓记录（先进先出计算结果）
+            if fifo_position['remaining_batches']:
+                md_content += "\n### 最终剩余持仓（先进先出计算）\n"
+                for i, batch in enumerate(fifo_position['remaining_batches']):
+                    md_content += f"- 批次{i+1}: {batch['shares']} 股 @ {batch['price']} 元 (日期: {batch['date']})\n"
+                md_content += f"- 总计: {fifo_position['total_shares']} 股\n"
+                md_content += f"- 平均持仓成本: {fifo_position['avg_cost']:.2f} 元\n"
+        
+        # 添加AI分析结果
+        md_content += "\n## AI技术趋势分析结果\n"
+        md_content += analysis_content
+        
+        # 保存文件
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        
+        print(f"技术趋势LLM分析报告已保存为: {file_path}")
+        return file_path
     
     def run_analysis(self):
         """运行完整分析"""
-        self.load_data()
-        self.analyze_technical_indicators()
-        report = self.generate_trend_report()
-        self.print_report(report)
-        self.save_report(report)
-        return report
-
-def main():
-    """主函数"""
-    import argparse
-    
-    # 解析命令行参数
-    parser = argparse.ArgumentParser(description="分析股票技术指标趋势")
-    parser.add_argument('--ticker', help="股票代码，例如：300433.SZ，若不指定则使用config.py中的第一个股票")
-    args = parser.parse_args()
-    
-    # 从配置文件中获取股票代码
-    from config import STOCK_TICKERS
-    
-    # 确定股票代码
-    if args.ticker:
-        ticker = args.ticker
-    else:
-        # 使用第一个股票代码进行分析
-        ticker_name, ticker = next(iter(STOCK_TICKERS.items()))
-        print(f"使用配置文件中的股票代码: {ticker} ({ticker_name})")
-    
-    file_path = f'{DATA_DIR}/{ticker}/{ticker}_indicators.csv'
-    print(f"分析股票: {ticker}")
-    
-    # 分析数据
-    analyzer = StockTechnicalTrendAnalyzer(file_path)
-    analyzer.run_analysis()
+        # 加载技术趋势分析数据
+        if not self.load_technical_trend_data():
+            print("无法加载技术趋势分析数据，分析终止")
+            return
+        
+        # 获取股票基本信息
+        self.get_stock_info()
+        
+        # 加载交易记录和计算持仓情况
+        self.load_trading_records()
+        
+        # 生成AI提示词
+        prompt = self.generate_ai_prompt()
+        print("\n=== 生成的AI分析提示词 ===")
+        print(prompt[:2000] + "..." if len(prompt) > 2000 else prompt)  # 只显示前2000个字符
+        print(f"\n提示词长度: {len(prompt)} 字符")
+        
+        # 获取AI分析结果
+        ai_analysis = self.get_ai_analysis(prompt)
+        
+        print("\n=== AI分析结果 ===")
+        print(ai_analysis)
+        
+        # 保存分析结果到markdown文件
+        self.save_analysis_to_md(ai_analysis)
+        
+        # 提示用户如何使用
+        print("\n=== 分析完成 ===")
+        print("技术趋势LLM分析报告已保存为markdown文件，包含详细的技术分析和操作建议。")
+        
+        return ai_analysis
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="使用本地Ollama AI进行股票技术趋势分析")
+    parser.add_argument('--ticker', required=True, help="股票代码，例如：300433.SZ")
+    parser.add_argument('--strategy', choices=['trend_following', 'mean_reversion', 'swing', 'neutral'],
+                        default='trend_following', help="交易策略视角（默认 trend_following）")
+    args = parser.parse_args()
+
+    ticker = args.ticker
+    print(f"\n=====================================")
+    print(f"分析股票: {ticker} | 策略视角: {args.strategy}")
+    print("=====================================")
+
+    analyzer = TechnicalTrendLLMAnalyzer(ticker, strategy=args.strategy)
+    analyzer.run_analysis()

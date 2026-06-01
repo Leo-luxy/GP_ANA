@@ -234,130 +234,14 @@ def get_stock_fund_flow_data(ticker):
         return None
 
 
-def get_stock_margin_data(ticker):
-    """获取单个股票的融资融券数据"""
-    print(f"\n开始获取 {ticker} 的融资融券数据...")
-    
-    # 解析股票代码
-    code = ticker.split('.')[0]
-    market = 'sh' if ticker.endswith('.SH') else 'sz'
-    
-    # 构建股票文件夹路径
-    stock_dir = os.path.join(DATA_DIR, ticker)
-    os.makedirs(stock_dir, exist_ok=True)
-    
-    # 构建输出文件路径
-    output_file = os.path.join(stock_dir, f"{ticker}_margin_data.csv")
-    
-    # 初始化结果数据
-    margin_data = []
-    
-    # 确定开始和结束日期
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)  # 默认最近30天
-    
-    # 检查本地是否已有数据
-    if os.path.exists(output_file):
-        try:
-            existing_df = pd.read_csv(output_file)
-            if not existing_df.empty:
-                # 尝试获取日期列
-                if 'date' in existing_df.columns:
-                    # 尝试解析日期
-                    try:
-                        existing_df['date'] = pd.to_datetime(existing_df['date'], format='%Y%m%d')
-                        last_date = existing_df['date'].max()
-                        print(f"本地已有融资融券数据，最后日期: {last_date.strftime('%Y-%m-%d')}")
-                        
-                        # 如果最后日期已经是今天或昨天，跳过获取
-                        if last_date.date() >= (end_date - timedelta(days=1)).date():
-                            print("融资融券数据已是最新，无需更新")
-                            return existing_df
-                        
-                        # 从最后日期的下一天开始获取
-                        start_date = last_date + timedelta(days=1)
-                    except Exception as e:
-                        print(f"解析日期时出错: {str(e)}")
-        except Exception as e:
-            print(f"读取本地融资融券数据时出错: {str(e)}")
-    
-    # 转换日期格式
-    start_str = start_date.strftime('%Y%m%d')
-    end_str = end_date.strftime('%Y%m%d')
-    
-    print(f"时间范围: {start_str} 到 {end_str}")
-    
-    # 遍历日期范围
-    current_date = start_date
-    while current_date <= end_date:
-        # 检查是否为周末
-        if current_date.weekday() >= 5:  # 0-4是工作日，5-6是周末
-            date_str = current_date.strftime('%Y%m%d')
-            print(f"跳过周末日期: {date_str}")
-            # 增加一天
-            current_date += timedelta(days=1)
-            continue
-        
-        date_str = current_date.strftime('%Y%m%d')
-        print(f"获取 {date_str} 的数据...")
-        
-        try:
-            time.sleep(random.uniform(1, 3))  # 随机间隔1-3秒
-            
-            if market == 'sh':
-                # 获取沪市融资融券数据
-                margin_df = ak.stock_margin_detail_sse(date=date_str)
-                # 筛选目标股票
-                stock_data = margin_df[margin_df['标的证券代码'] == code]
-            else:
-                # 获取深市融资融券数据
-                margin_df = ak.stock_margin_detail_szse(date=date_str)
-                # 筛选目标股票
-                stock_data = margin_df[margin_df['证券代码'] == code]
-            
-            if not stock_data.empty:
-                # 添加日期列，使用copy()避免SettingWithCopyWarning
-                stock_data = stock_data.copy()
-                stock_data['date'] = date_str
-                margin_data.append(stock_data)
-                print(f"成功获取 {date_str} 的数据")
-            else:
-                print(f"{date_str} 无 {ticker} 的融资融券数据")
-                
-        except Exception as e:
-            print(f"获取 {date_str} 数据时出错: {str(e)}")
-        
-        # 增加一天
-        current_date += timedelta(days=1)
-    
-    # 合并数据
-    if margin_data:
-        result_df = pd.concat(margin_data, ignore_index=True)
-        
-        # 如果本地已有数据，追加新数据
-        if os.path.exists(output_file):
-            result_df.to_csv(output_file, mode='a', header=False, index=False, encoding='utf-8-sig')
-            print(f"融资融券数据已追加到: {output_file}")
-            print(f"共追加 {len(result_df)} 条数据")
-        else:
-            # 首次保存
-            result_df.to_csv(output_file, index=False, encoding='utf-8-sig')
-            print(f"融资融券数据已保存到: {output_file}")
-            print(f"共获取 {len(result_df)} 条数据")
-        return result_df
-    else:
-        print(f"未获取到 {ticker} 的融资融券数据")
-        return None
-
-
 def main():
     """主函数"""
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description='收集股票市场数据')
+    parser = argparse.ArgumentParser(description='收集股票估值和资金流数据')
     parser.add_argument('--ticker', type=str, help='指定股票代码，例如：300433.SZ')
     args = parser.parse_args()
     
-    print("开始收集估值、资金流和融资融券数据...")
+    print("开始收集估值和资金流数据...")
     
     # 确定股票列表
     if args.ticker:
@@ -375,9 +259,8 @@ def main():
         print(f"\n=== 处理股票: {name} ({ticker}) ===")
         get_stock_valuation_data(ticker)
         get_stock_fund_flow_data(ticker)
-        get_stock_margin_data(ticker)
     
-    print("\n估值、资金流和融资融券数据收集完成！")
+    print("\n估值和资金流数据收集完成！")
 
 
 if __name__ == "__main__":

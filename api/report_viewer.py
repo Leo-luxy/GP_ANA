@@ -5,22 +5,10 @@ import sys
 import json
 from flask import Blueprint, request, jsonify
 
+from .common import get_exchange_suffix
+
 # 创建蓝图
 report_viewer_bp = Blueprint('report_viewer', __name__)
-
-# 股票代码交易所映射
-SSE_PREFIXES = ['600', '601', '603', '688']  # 上海证券交易所
-SZSE_PREFIXES = ['000', '001', '002', '300']  # 深圳证券交易所
-
-def get_exchange_suffix(stock_code):
-    """根据股票代码获取交易所后缀"""
-    prefix = stock_code[:3]
-    if prefix in SSE_PREFIXES:
-        return '.SH'
-    elif prefix in SZSE_PREFIXES:
-        return '.SZ'
-    else:
-        return '.SZ'  # 默认返回深圳
 
 @report_viewer_bp.route('/stocks')
 def get_stocks():

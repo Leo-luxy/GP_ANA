@@ -627,7 +627,7 @@ def get_ai_analysis(prompt):
             ],
             options={
                 "temperature": temperature,
-                "max_tokens": max_tokens
+                "num_predict": max_tokens
             }
         )
         

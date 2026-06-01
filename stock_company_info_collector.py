@@ -63,42 +63,22 @@ def save_to_csv(file_path, data, fieldnames, id_field):
                 reader = csv.DictReader(f)
                 for row in reader:
                     # 生成唯一标识
-                    if id_field == '序号':
-                        # 对于研究报告和主要股东数据，使用序号+日期作为唯一标识
-                        if '日期' in row:
-                            row_id = f"{row.get('序号', '')}_{row.get('日期', '')}"
-                        elif '截至日期' in row:
-                            row_id = f"{row.get('序号', '')}_{row.get('截至日期', '')}"
-                        else:
-                            row_id = str(row.get(id_field, ''))
-                    elif id_field == 'HOLDER_CODE' and 'REPORT_DATE' in row:
-                        # 对于机构持股数据，使用 HOLDER_CODE + REPORT_DATE 作为唯一标识
-                        row_id = f"{row.get('HOLDER_CODE', '')}_{row.get('REPORT_DATE', '')}"
-                    else:
-                        # 其他情况保持原逻辑
-                        row_id = str(row.get(id_field, ''))
+                    row_id = generate_row_id(row, id_field)
                     existing_data[row_id] = row
         except Exception as e:
             print(f"读取CSV文件失败: {e}")
+            # 如果读取失败，删除损坏的文件，重新创建
+            try:
+                os.remove(file_path)
+                print(f"已删除损坏的文件: {file_path}")
+            except Exception as e2:
+                print(f"删除损坏文件失败: {e2}")
     
     # 去重并添加新数据
     new_data = []
     for item in data:
         # 生成唯一标识
-        if id_field == '序号':
-            # 对于研究报告和主要股东数据，使用序号+日期作为唯一标识
-            if '日期' in item:
-                item_id = f"{item.get('序号', '')}_{item.get('日期', '')}"
-            elif '截至日期' in item:
-                item_id = f"{item.get('序号', '')}_{item.get('截至日期', '')}"
-            else:
-                item_id = str(item.get(id_field, ''))
-        elif id_field == 'HOLDER_CODE' and 'REPORT_DATE' in item:
-            # 对于机构持股数据，使用 HOLDER_CODE + REPORT_DATE 作为唯一标识
-            item_id = f"{item.get('HOLDER_CODE', '')}_{item.get('REPORT_DATE', '')}"
-        else:
-            # 其他情况保持原逻辑
-            item_id = str(item.get(id_field, ''))
+        item_id = generate_row_id(item, id_field)
         
         if item_id not in existing_data:
             new_data.append(item)
@@ -106,21 +86,53 @@ def save_to_csv(file_path, data, fieldnames, id_field):
     # 如果有新数据，保存
     if new_data:
         # 确定所有字段
-        all_fieldnames = fieldnames
+        all_fieldnames = fieldnames.copy()
         for item in new_data:
             for key in item.keys():
                 if key not in all_fieldnames:
                     all_fieldnames.append(key)
         
-        # 写入文件
-        mode = 'a' if existing_data else 'w'
-        with open(file_path, mode, newline='', encoding='utf-8') as f:
+        # 写入文件（使用覆盖模式，确保文件结构正确）
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=all_fieldnames)
-            if not existing_data:
-                writer.writeheader()
+            writer.writeheader()
+            # 先写入现有数据
+            for row in existing_data.values():
+                writer.writerow(row)
+            # 再写入新数据
             for item in new_data:
                 writer.writerow(item)
-        print(f"已保存 {len(new_data)} 条新数据到 {file_path}")
+        print(f"已保存 {len(existing_data)} 条现有数据和 {len(new_data)} 条新数据到 {file_path}")
+    else:
+        print(f"文件 {file_path} 数据已是最新，无需更新")
+
+def generate_row_id(row, id_field):
+    """生成行的唯一标识"""
+    if id_field == '序号':
+        # 对于研究报告和主要股东数据，使用序号+日期作为唯一标识
+        if '日期' in row:
+            return f"{row.get('序号', '')}_{row.get('日期', '')}"
+        elif '截至日期' in row:
+            return f"{row.get('序号', '')}_{row.get('截至日期', '')}"
+        elif 'REPORT_DATE' in row:
+            return f"{row.get('序号', '')}_{row.get('REPORT_DATE', '')}"
+        else:
+            return str(row.get(id_field, ''))
+    elif id_field == 'HOLDER_CODE' and 'REPORT_DATE' in row:
+        # 对于机构持股数据，使用 HOLDER_CODE + REPORT_DATE 作为唯一标识
+        return f"{row.get('HOLDER_CODE', '')}_{row.get('REPORT_DATE', '')}"
+    elif id_field == 'HOLDER_NAME' and 'END_DATE' in row:
+        # 对于股东数据，使用 HOLDER_NAME + END_DATE 作为唯一标识
+        return f"{row.get('HOLDER_NAME', '')}_{row.get('END_DATE', '')}"
+    elif id_field == '序号' and '报告日' in row:
+        # 对于财务报表数据，使用序号+报告日作为唯一标识
+        return f"{row.get('序号', '')}_{row.get('报告日', '')}"
+    elif id_field == 'TRADE_DATE':
+        # 对于北向资金数据，使用 TRADE_DATE 作为唯一标识
+        return str(row.get('TRADE_DATE', ''))
+    else:
+        # 其他情况保持原逻辑
+        return str(row.get(id_field, ''))
 
 
 def get_stock_company_info(ticker):
@@ -438,6 +450,48 @@ def get_stock_company_info(ticker):
             company_info['financial_abstract'] = financial_abstract_df.to_dict('records')[0]
     except Exception as e:
         print(f"获取财务摘要时出错: {str(e)}")
+    
+    # 10. 获取主要股东数据并直接保存到CSV（覆盖模式）
+    print("获取主要股东数据...")
+    try:
+        time.sleep(random.uniform(2, 4))
+        # 使用 akshare 获取前十大股东数据（需要市场前缀）
+        stock_symbol = f"{market}{code}"  # 如 sz300433 或 sh600000
+        main_shareholders_df = ak.stock_main_stock_holder(stock=stock_symbol)
+        if not main_shareholders_df.empty:
+            # 转换为字典列表
+            main_shareholders = main_shareholders_df.to_dict('records')
+            company_info['main_shareholders'] = main_shareholders
+            
+            # 直接保存到CSV文件（覆盖模式，按时间升序）
+            main_shareholders_path = os.path.join(stock_dir, f"{ticker}_main_shareholders.csv")
+            
+            # 定义CSV字段
+            csv_fields = ['ticker', 'report_date', 'shareholder_name', 'shareholding_amount', 'shareholding_ratio', 'share_type', 'announcement_date']
+            
+            # 按报告日期升序排序
+            sorted_shareholders = sorted(main_shareholders, key=lambda x: x.get('REPORT_DATE', '') or x.get('report_date', '') or x.get('截至日期', ''))
+            
+            # 覆盖模式写入CSV
+            with open(main_shareholders_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=csv_fields)
+                writer.writeheader()
+                for shareholder in sorted_shareholders:
+                    row = {
+                        'ticker': ticker,
+                        'report_date': shareholder.get('REPORT_DATE', '') or shareholder.get('report_date', '') or shareholder.get('截至日期', ''),
+                        'shareholder_name': shareholder.get('HOLDER_NAME', '') or shareholder.get('shareholder_name', '') or shareholder.get('股东名称', ''),
+                        'shareholding_amount': shareholder.get('HOLD_NUM', '') or shareholder.get('shareholding_amount', '') or shareholder.get('持股数量', ''),
+                        'shareholding_ratio': shareholder.get('HOLD_RATIO', '') or shareholder.get('shareholding_ratio', '') or shareholder.get('持股比例', ''),
+                        'share_type': shareholder.get('SHARE_TYPE', '') or shareholder.get('share_type', '') or shareholder.get('股本性质', ''),
+                        'announcement_date': shareholder.get('ANNOUNCE_DATE', '') or shareholder.get('announcement_date', '') or shareholder.get('公告日期', '')
+                    }
+                    writer.writerow(row)
+            print(f"主要股东数据已覆盖保存到: {main_shareholders_path}")
+        else:
+            print("未获取到主要股东数据")
+    except Exception as e:
+        print(f"获取主要股东数据时出错: {str(e)}")
     
     # 保存公司基本信息到company_basic.json（覆盖保存）
     basic_info = {

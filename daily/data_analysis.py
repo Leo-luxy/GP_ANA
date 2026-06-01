@@ -188,7 +188,7 @@ class DataAnalyzer:
             os.makedirs(stock_dir)
         
         # 选择关键技术指标
-        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'DIF', 'RSI', 'CCI', 'WR']
+        indicators = ['close', 'MA5', 'MA20', 'MA60', 'VOL5', 'K', 'D', 'J', 'DIF', 'RSI', 'CCI', 'WR', 'OBV', 'ATR', 'ADX', 'MFI']
         
         # 计算相关性矩阵
         corr_matrix = self.data[indicators].corr()

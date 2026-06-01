@@ -1,27 +1,16 @@
 # api/detailed.py
-# 详细模式相关的API
+# 详细模式相关的API（单步数据抓取/分析/查询）
 import os
 import sys
 import subprocess
 import json
 from flask import Blueprint, request, jsonify
 
+from utils import calculate_technical_indicators
+from .common import get_exchange_suffix
+
 # 创建蓝图
 detailed_bp = Blueprint('detailed', __name__)
-
-# 股票代码交易所映射
-SSE_PREFIXES = ['600', '601', '603', '688']  # 上海证券交易所
-SZSE_PREFIXES = ['000', '001', '002', '300']  # 深圳证券交易所
-
-def get_exchange_suffix(stock_code):
-    """根据股票代码获取交易所后缀"""
-    prefix = stock_code[:3]
-    if prefix in SSE_PREFIXES:
-        return '.SH'
-    elif prefix in SZSE_PREFIXES:
-        return '.SZ'
-    else:
-        return '.SZ'  # 默认返回深圳
 
 @detailed_bp.route('/detailed_function', methods=['POST'])
 def detailed_function():
@@ -70,10 +59,13 @@ def detailed_function():
                 # 其他数据类型的抓取
                 if data_type == 'daily':
                     # 抓取日更数据
-                    command = f'python check_data_updates.py --ticker {full_stock_code}'
+                    command = [
+                        f'python check_data_updates.py --ticker {full_stock_code}',
+                        f'python calculate_technical_trend_ds.py --ticker {full_stock_code}'
+                    ]
                 elif data_type == 'performance':
                     # 抓取业绩预告与分红数据
-                    command = f'python analyze_performance_forecast.py --ticker {full_stock_code}'
+                    command = f'python important_missing_data_collector.py --ticker {full_stock_code}'
                 elif data_type == 'shareholder':
                     # 抓取股东数据，依次执行三个程序
                     commands = [
@@ -99,11 +91,11 @@ def detailed_function():
                 elif data_type == 'industry':
                     # 抓取同行对比数据，依次执行五个程序
                     commands = [
-                        f'python fetch_stock_market_performance.py --ticker {full_stock_code}',
-                        f'python fetch_industry_valuation.py --ticker {full_stock_code}',
-                        f'python fetch_industry_peers.py --ticker {full_stock_code}',
-                        f'python fetch_industry_growth.py --ticker {full_stock_code}',
-                        f'python fetch_dupont_analysis.py --ticker {full_stock_code}',
+                        f'python eastmoney_fetcher.py --type market_performance --ticker {full_stock_code}',
+                        f'python eastmoney_fetcher.py --type industry_valuation --ticker {full_stock_code}',
+                        f'python eastmoney_fetcher.py --type industry_peers --ticker {full_stock_code}',
+                        f'python eastmoney_fetcher.py --type industry_growth --ticker {full_stock_code}',
+                        f'python eastmoney_fetcher.py --type dupont --ticker {full_stock_code}',
                         f'python shenwan_industry_collector.py --ticker {full_stock_code}'
                     ]
                     # 依次执行命令
@@ -152,10 +144,10 @@ def detailed_function():
             # 分析数据
             if data_type == 'periodic':
                 # 分析低频数据
-                command = f'python batch_analyze_periodic.py --ticker {full_stock_code}'
+                command = f'python batch_analyze.py --mode periodic --ticker {full_stock_code}'
             elif data_type == 'daily':
                 # 分析日更数据
-                command = f'python batch_analyze_daily.py --ticker {full_stock_code}'
+                command = f'python batch_analyze.py --mode daily --ticker {full_stock_code}'
             elif data_type == 'performance':
                 # 分析业绩预告与分红数据
                 command = f'python analyze_performance_forecast.py --ticker {full_stock_code}'
@@ -326,6 +318,26 @@ def detailed_function():
                     'update_frequency': '每日'
                 })
                 
+                # 技术指标数据
+                indicators_file = os.path.join(data_dir, f'{full_stock_code}_indicators.csv')
+                files_info.append({
+                    'file_name': f'{full_stock_code}_indicators.csv',
+                    'exists': os.path.exists(indicators_file),
+                    'modified_time': os.path.getmtime(indicators_file) if os.path.exists(indicators_file) else None,
+                    'content': '日线技术指标数据',
+                    'update_frequency': '每日'
+                })
+
+                # 技术趋势数据
+                technical_trend_file = os.path.join(data_dir, f'{full_stock_code}_technical_trend_analysis.json')
+                files_info.append({
+                    'file_name': f'{full_stock_code}_technical_trend_analysis.json',
+                    'exists': os.path.exists(technical_trend_file),
+                    'modified_time': os.path.getmtime(technical_trend_file) if os.path.exists(technical_trend_file) else None,
+                    'content': '日线技术趋势数据',
+                    'update_frequency': '每日'
+                })
+
                 # 资金流数据
                 fund_flow_file = os.path.join(data_dir, f'{full_stock_code}_fund_flow.csv')
                 files_info.append({
@@ -528,4 +540,62 @@ def detailed_function():
         return jsonify({
             'success': False,
             'message': f'执行功能失败：{str(e)}'
+        })
+
+@detailed_bp.route('/execute_single_function', methods=['POST'])
+def execute_single_function():
+    """执行单功能"""
+    data = request.json
+    category = data.get('category', '')
+    program = data.get('program', '')
+    stock_code = data.get('stock_code', '').strip()
+    
+    if not stock_code or len(stock_code) != 6 or not stock_code.isdigit():
+        return jsonify({
+            'success': False,
+            'message': '请输入6位数字的股票代码'
+        })
+    
+    if not program:
+        return jsonify({
+            'success': False,
+            'message': '请选择要执行的程序'
+        })
+    
+    full_stock_code = stock_code + get_exchange_suffix(stock_code)
+    
+    try:
+        # 构建命令
+        if program.startswith('daily/'):
+            # 处理daily目录下的程序
+            command = f'python {program} --ticker {full_stock_code}'
+        else:
+            # 处理根目录下的程序
+            command = f'python {program} --ticker {full_stock_code}'
+        
+        # 执行命令
+        result = subprocess.run(
+            command, 
+            shell=True, 
+            capture_output=True, 
+            text=True
+        )
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': '程序执行成功',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '程序执行失败',
+                'error': result.stderr
+            })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'执行程序失败：{str(e)}'
         })

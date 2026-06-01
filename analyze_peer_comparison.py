@@ -713,7 +713,7 @@ def get_ai_analysis(ticker, prompt):
             ],
             options={
                 "temperature": AI_CONFIG['temperature'],
-                "max_tokens": AI_CONFIG['max_tokens']
+                "num_predict": AI_CONFIG['max_tokens']
             }
         )
         
