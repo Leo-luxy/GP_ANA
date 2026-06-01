@@ -25,6 +25,79 @@
         .spinner-border {
             margin-top: 20px;
         }
+        .markdown-body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #333;
+            background-color: #fff;
+            padding: 16px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+        }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        .markdown-body h1 {
+            font-size: 2em;
+        }
+        .markdown-body h2 {
+            font-size: 1.5em;
+        }
+        .markdown-body h3 {
+            font-size: 1.25em;
+        }
+        .markdown-body p {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        .markdown-body ul, .markdown-body ol {
+            margin-top: 0;
+            margin-bottom: 16px;
+            padding-left: 2em;
+        }
+        .markdown-body li {
+            margin-top: 0.25em;
+        }
+        .markdown-body code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.85em;
+            padding: 0.2em 0.4em;
+            margin: 0;
+            background-color: rgba(27,31,35,0.05);
+            border-radius: 3px;
+        }
+        .markdown-body pre {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.85em;
+            padding: 16px;
+            margin-top: 0;
+            margin-bottom: 16px;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            overflow: auto;
+        }
+        .markdown-body pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .markdown-body table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        .markdown-body table th, .markdown-body table td {
+            padding: 6px 13px;
+            border: 1px solid #dfe2e5;
+        }
+        .markdown-body table th {
+            font-weight: 600;
+            background-color: #f6f8fa;
+        }
     </style>
 </head>
 <body>
@@ -33,43 +106,29 @@
         
         <!-- 功能按钮 -->
         <div class="mb-4">
-            <button class="btn btn-primary me-2" onclick="showMainPage()">股票分析</button>
+            <button class="btn btn-primary me-2" onclick="showMainPage()">完整分析</button>
+            <button class="btn btn-success me-2" onclick="showQuickAnalysis()">快速分析</button>
             <button class="btn btn-secondary me-2" onclick="showTradingRecords()">买卖记录管理</button>
             <button class="btn btn-info me-2" onclick="showDetailedMode()">详细模式</button>
-
-            <button class="btn btn-success" onclick="showReportViewer()">报告查看</button>
+            <button class="btn btn-warning me-2" onclick="showSingleFunction()">单功能执行</button>
+            <button class="btn btn-danger me-2" onclick="showReportViewer()">报告查看</button>
+            <button class="btn btn-dark" onclick="showBacktestPage()">策略回测</button>
         </div>
         
-        <!-- 股票分析页面 -->
+        <!-- 完整分析页面 -->
         <div class="card" id="main-page">
             <div class="card-body">
-                <h5 class="card-title">股票分析</h5>
-                
+                <h5 class="card-title">完整分析（五维度两层决策）</h5>
+                <p class="text-muted small">全量数据采集 → 财务+情绪+技术+股东+研报 → 冲突检测 → 交易计划</p>
+
                 <!-- 股票代码输入 -->
                 <div class="form-group">
                     <label for="stock-code" class="form-label">股票代码（6位数字）</label>
                     <input type="text" id="stock-code" class="form-control" placeholder="例如：300433">
                 </div>
-                
-                <!-- 分析类型选择 -->
-                <div class="form-group mt-3">
-                    <label class="form-label">分析类型</label>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="analysis-type" id="analysis-init" value="init" checked>
-                        <label class="form-check-label" for="analysis-init">新股票初始化</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="analysis-type" id="analysis-daily" value="daily">
-                        <label class="form-check-label" for="analysis-daily">每日更新</label>
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="analysis-type" id="analysis-periodic" value="periodic">
-                        <label class="form-check-label" for="analysis-periodic">定期更新</label>
-                    </div>
-                </div>
-                
+
                 <!-- 开始分析按钮 -->
-                <button class="btn btn-primary mt-3" onclick="startAnalysis()">开始分析</button>
+                <button class="btn btn-primary mt-3" onclick="startAnalysis()">开始完整分析</button>
                 
                 <!-- 任务状态 -->
                 <div id="task-status" class="mt-4" style="display: none;">
@@ -88,6 +147,57 @@
                     <h5 id="report-title"></h5>
                     <div id="report-body"></div>
                     <button class="btn btn-secondary mt-3" onclick="showReportList()">返回报告列表</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 快速分析页面 -->
+        <div class="card mt-4" id="quick-analysis" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">快速分析</h5>
+                
+                <!-- 股票代码输入 -->
+                <div class="form-group">
+                    <label for="quick-stock-code" class="form-label">股票代码（6位数字）</label>
+                    <input type="text" id="quick-stock-code" class="form-control" placeholder="例如：300433">
+                </div>
+                
+                <!-- 每日更新 -->
+                <input type="hidden" id="quick-analysis-type" value="daily">
+
+                <!-- 策略模式选择 -->
+                <div class="form-group mt-3">
+                    <label class="form-label">策略模式</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="strategy-mode" id="strategy-short" value="short" checked>
+                        <label class="form-check-label" for="strategy-short">短期交易</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="strategy-mode" id="strategy-medium" value="medium">
+                        <label class="form-check-label" for="strategy-medium">中期持仓</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="strategy-mode" id="strategy-long" value="long">
+                        <label class="form-check-label" for="strategy-long">长期投资</label>
+                    </div>
+                </div>
+                
+                <!-- 按钮组 -->
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-success" onclick="startQuickAnalysis()">开始快速分析</button>
+                    <button class="btn btn-secondary" onclick="showMainPage()">返回首页</button>
+                </div>
+                
+                <!-- 任务状态 -->
+                <div id="quick-task-status" class="mt-4" style="display: none;">
+                    <h5>任务状态</h5>
+                    <div id="quick-status-content"></div>
+                </div>
+                
+                <!-- 分析结果 -->
+                <div id="quick-report" class="mt-4" style="display: none;">
+                    <h5>分析结果</h5>
+                    <div id="quick-report-content"></div>
                 </div>
             </div>
         </div>
@@ -191,7 +301,6 @@
             </div>
         </div>
         
-
         
         <!-- 报告查看器 -->
         <div class="card mt-4" id="report-viewer" style="display: none;">
@@ -225,29 +334,148 @@
                 <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
             </div>
         </div>
+        
+        <!-- 策略回测页面 -->
+        <div class="card mt-4" id="backtest-page" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">策略回测</h5>
+                
+                <!-- 回测模式选择 -->
+                <div class="form-group mt-3">
+                    <label class="form-label">回测模式</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="backtest-mode" id="backtest-full" value="full" checked>
+                        <label class="form-check-label" for="backtest-full">完整流程（数据更新+回测+报告）</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="backtest-mode" id="backtest-quick" value="quick">
+                        <label class="form-check-label" for="backtest-quick">快速回测（仅回测+报告）</label>
+                    </div>
+                </div>
+                
+                <!-- 策略版本选择 -->
+                <div class="form-group mt-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="use-simplified" value="simplified">
+                        <label class="form-check-label" for="use-simplified">使用简化版策略（MA5 > MA20）</label>
+                        <small class="form-text text-muted">不勾选则使用完整版策略（MA5 > MA10 > MA20 > MA60）</small>
+                    </div>
+                </div>
+                
+                <!-- 运行回测按钮 -->
+                <button class="btn btn-dark mt-3" onclick="runBacktest()">开始策略回测</button>
+                
+                <!-- 任务状态 -->
+                <div id="backtest-task-status" class="mt-4" style="display: none;">
+                    <h5>回测任务状态</h5>
+                    <div id="backtest-status-content"></div>
+                </div>
+                
+                <!-- 监控报告 -->
+                <div id="backtest-report" class="mt-4" style="display: none;">
+                    <h5>监控报告</h5>
+                    <div id="backtest-report-content"></div>
+                </div>
+                
+                <!-- 股票列表 -->
+                <div id="backtest-stock-list" class="mt-4" style="display: none;">
+                    <h5>股票回测图表</h5>
+                    <div id="backtest-stocks-container"></div>
+                </div>
+                
+                <!-- 图表查看模态框 -->
+                <div class="modal fade" id="chartModal" tabindex="-1" aria-labelledby="chartModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="chartModalLabel">回测图表</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <img id="chartImage" src="" class="img-fluid" alt="回测图表">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
+            </div>
+        </div>
+        
+        <!-- 单功能执行 -->
+        <div class="card mt-4" id="single-function" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">单功能执行</h5>
+                
+                <!-- 功能分类选择 -->
+                <div class="form-group">
+                    <label for="function-category" class="form-label">功能分类</label>
+                    <select id="function-category" class="form-control" onchange="updateProgramList()">
+                        <option value="analysis">分析程序</option>
+                        <option value="calculation">计算程序</option>
+                        <option value="fetch">抓取程序</option>
+                    </select>
+                </div>
+                
+                <!-- 程序选择 -->
+                <div class="form-group mt-3">
+                    <label for="program-select" class="form-label">程序选择</label>
+                    <select id="program-select" class="form-control">
+                        <!-- 程序列表将通过JavaScript动态更新 -->
+                    </select>
+                </div>
+                
+                <!-- 股票代码输入 -->
+                <div class="form-group mt-3">
+                    <label for="single-function-stock-code" class="form-label">股票代码（6位数字）</label>
+                    <input type="text" id="single-function-stock-code" class="form-control" placeholder="例如：600313">
+                </div>
+                
+                <!-- 执行按钮 -->
+                <button class="btn btn-primary mt-3" onclick="executeSingleFunction()">执行程序</button>
+                
+                <!-- 执行结果 -->
+                <div class="mt-4">
+                    <h6>执行结果</h6>
+                    <div id="single-function-result">请选择程序并执行</div>
+                </div>
+                
+                <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
+            </div>
+        </div>
     </div>
     
     <!-- 版本信息 -->
     <div class="container mt-4 mb-4">
         <div class="text-center text-muted">
-            <p>版本：v1.0.0 | 修改日期：2026-04-17</p>
+            <p>版本：v1.2.0 | 修改日期：2026-06-01</p>
         </div>
     </div>
     
     <script>
         // 页面切换函数
         function showMainPage() {
+            document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
+            document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('main-page').style.display = 'block';
         }
         
+        function showQuickAnalysis() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'block';
+        }
+        
         function showTradingRecords() {
             document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('trading-records').style.display = 'block';
             loadTradingRecords();
@@ -255,44 +483,53 @@
         
         function showDetailedMode() {
             document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
-
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'block';
         }
         
-
         
         function showReportViewer() {
             document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
+            document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'block';
             loadStocks();
+        }
+        
+        function showSingleFunction() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('single-function').style.display = 'block';
+            updateProgramList();
         }
         
         // 股票分析相关函数
         function startAnalysis() {
             const stockCode = document.getElementById('stock-code').value.trim();
-            const analysisType = document.querySelector('input[name="analysis-type"]:checked').value;
-            
+
             if (!stockCode || stockCode.length !== 6 || !/^\d+$/.test(stockCode)) {
                 alert('请输入6位数字的股票代码');
                 return;
             }
-            
+
             // 显示任务状态
             document.getElementById('task-status').style.display = 'block';
             document.getElementById('status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
-            
-            // 发送分析请求
+
+            // 发送分析请求（完整分析，仅 init）
             fetch('/api/analyze', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ stock_code: stockCode, task_type: analysisType })
+                body: JSON.stringify({ stock_code: stockCode })
             })
             .then(response => response.json())
             .then(data => {
@@ -348,6 +585,20 @@
                     let messages = data.messages || [];
                     let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
                     statusContent.innerHTML = `<div class="alert alert-danger">任务失败：<br>${messageHtml}</div>`;
+                } else if (data.status === 'pending') {
+                    // 任务正在等待处理
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">等待处理...</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 500px; overflow-y: auto;" id="message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    // 继续轮询
+                    setTimeout(() => pollTaskStatus(taskId), 2000);
                 } else {
                     // 任务不存在
                     statusContent.innerHTML = `<div class="alert alert-warning">任务不存在</div>`;
@@ -370,7 +621,6 @@
             document.getElementById('task-status').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
             document.getElementById('report-viewer').style.display = 'none';
             
             // 显示报告列表
@@ -408,7 +658,6 @@
             document.getElementById('task-status').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
             document.getElementById('report-viewer').style.display = 'none';
             
             // 隐藏报告列表，显示报告内容
@@ -438,12 +687,132 @@
             document.getElementById('task-status').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
-
             document.getElementById('report-viewer').style.display = 'none';
             
             // 隐藏报告内容，显示报告列表
             document.getElementById('report-content-old').style.display = 'none';
             document.getElementById('report-list').style.display = 'block';
+        }
+        
+        // 快速分析相关函数
+        function startQuickAnalysis() {
+            const stockCode = document.getElementById('quick-stock-code').value.trim();
+            const analysisType = 'daily';  // 快速分析仅支持每日更新
+            const strategyMode = document.querySelector('input[name="strategy-mode"]:checked').value;
+            
+            if (!stockCode || stockCode.length !== 6 || !/^\d+$/.test(stockCode)) {
+                alert('请输入6位数字的股票代码');
+                return;
+            }
+            
+            // 显示任务状态
+            document.getElementById('quick-task-status').style.display = 'block';
+            document.getElementById('quick-status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
+            
+            // 发送分析请求
+            fetch('/api/quick_analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stock_code: stockCode, task_type: analysisType, strategy_mode: strategyMode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 轮询任务状态
+                    pollQuickTaskStatus(data.task_id, stockCode);
+                } else {
+                    document.getElementById('quick-status-content').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('quick-status-content').innerHTML = `<div class="alert alert-danger">请求失败：${error.message}</div>`;
+            });
+        }
+        
+        function pollQuickTaskStatus(taskId, stockCode) {
+            const statusContent = document.getElementById('quick-status-content');
+            
+            fetch(`/api/quick_task_status/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'running') {
+                    // 显示进度和消息
+                    let progress = data.progress || 0;
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">${progress}%</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 500px; overflow-y: auto;" id="quick-message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    // 自动滚动到最新内容
+                    setTimeout(() => {
+                        const messageContainer = document.getElementById('quick-message-container');
+                        if (messageContainer) {
+                            messageContainer.scrollTop = messageContainer.scrollHeight;
+                        }
+                    }, 100);
+                    // 继续轮询
+                    setTimeout(() => pollQuickTaskStatus(taskId, stockCode), 2000);
+                } else if (data.status === 'completed') {
+                    // 任务完成，显示分析结果
+                    statusContent.innerHTML = `<div class="alert alert-success">任务完成！</div>`;
+                    setTimeout(() => {
+                        loadQuickReport(stockCode);
+                    }, 1000);
+                } else if (data.status === 'failed') {
+                    // 任务失败
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `<div class="alert alert-danger">任务失败：<br>${messageHtml}</div>`;
+                } else if (data.status === 'pending') {
+                    // 任务正在等待处理
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">等待处理...</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 500px; overflow-y: auto;" id="quick-message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    // 继续轮询
+                    setTimeout(() => pollQuickTaskStatus(taskId, stockCode), 2000);
+                } else {
+                    // 任务不存在
+                    statusContent.innerHTML = `<div class="alert alert-warning">任务不存在</div>`;
+                }
+            })
+            .catch(error => {
+                statusContent.innerHTML = `<div class="alert alert-danger">获取状态失败：${error.message}</div>`;
+            });
+        }
+        
+        function loadQuickReport(stockCode) {
+            // 显示分析结果
+            document.getElementById('quick-report').style.display = 'block';
+            
+            fetch(`/api/quick_report/${stockCode}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 使用marked.js渲染Markdown内容
+                    const markdownContent = data.report_content;
+                    const htmlContent = marked.parse(markdownContent);
+                    document.getElementById('quick-report-content').innerHTML = `<div class="markdown-body">${htmlContent}</div>`;
+                } else {
+                    document.getElementById('quick-report-content').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('quick-report-content').innerHTML = `<div class="alert alert-danger">加载报告失败：${error.message}</div>`;
+            });
         }
         
         // 买卖记录管理相关函数
@@ -604,13 +973,8 @@
             });
         }
         
-
         
-
         
-
-        
-
         
         // 报告查看器相关函数
         function loadStocks() {
@@ -721,6 +1085,287 @@
         function showReportListNew() {
             document.getElementById('report-content').style.display = 'none';
             document.getElementById('report-list-new').style.display = 'block';
+        }
+        
+        // 单功能执行相关函数
+        function updateProgramList() {
+            const category = document.getElementById('function-category').value;
+            const programSelect = document.getElementById('program-select');
+            
+            // 清空现有选项
+            programSelect.innerHTML = '';
+            
+            // 根据分类添加程序选项
+            let programs = [];
+            
+            if (category === 'analysis') {
+                programs = [
+                    { value: 'analyze_em_financial.py', label: 'analyze_em_financial.py - 分析东方财富的财务数据' },
+                    { value: 'analyze_financial_statements.py', label: 'analyze_financial_statements.py - 分析财务报表数据' },
+                    { value: 'analyze_fund_flow.py', label: 'analyze_fund_flow.py - 分析资金流数据' },
+                    { value: 'analyze_margin_data.py', label: 'analyze_margin_data.py - 分析融资融券数据' },
+                    { value: 'analyze_peer_comparison.py', label: 'analyze_peer_comparison.py - 分析同行比较数据' },
+                    { value: 'analyze_performance_forecast.py', label: 'analyze_performance_forecast.py - 分析业绩预测数据' },
+                    { value: 'analyze_research_reports.py', label: 'analyze_research_reports.py - 分析研究报告' },
+                    { value: 'analyze_shareholder_structure.py', label: 'analyze_shareholder_structure.py - 分析股东结构数据' },
+                    { value: 'analyze_technical_trend.py', label: 'analyze_technical_trend.py - 基于技术趋势分析数据，使用Ollama AI进行技术趋势分析' },
+                    { value: 'analyze_valuation_data.py', label: 'analyze_valuation_data.py - 分析估值数据' },
+                    { value: 'batch_analyze.py --mode all', label: 'batch_analyze.py --mode all - 批量完整分析' },
+                    { value: 'batch_analyze.py --mode daily', label: 'batch_analyze.py --mode daily - 批量日数据分析' },
+                    { value: 'batch_analyze.py --mode periodic', label: 'batch_analyze.py --mode periodic - 批量定期分析' }
+                ];
+            } else if (category === 'calculation') {
+                programs = [
+                    { value: 'calculate_financial_indicators.py', label: 'calculate_financial_indicators.py - 计算财务指标' },
+                    { value: 'calculate_technical_trend_ds.py', label: 'calculate_technical_trend_ds.py - 计算技术趋势指标' },
+                    { value: 'daily/batch_analysis.py', label: 'daily/batch_analysis.py - 批量对多只股票执行完整的分析流程' }
+                ];
+            } else if (category === 'fetch') {
+                programs = [
+                    { value: 'stock_company_info_collector.py', label: 'stock_company_info_collector.py - 从东方财富等数据源获取股票公司基本信息' },
+                    { value: 'stock_market_data_collector.py', label: 'stock_market_data_collector.py - 从数据源获取股票的估值、资金流和融资融券数据' },
+                    { value: 'financial_indicators_collector.py', label: 'financial_indicators_collector.py - 从数据源收集财务指标数据' },
+                    { value: 'shenwan_industry_collector.py', label: 'shenwan_industry_collector.py - 申万行业分类数据' },
+                    { value: 'eastmoney_fetcher.py --type market_performance', label: 'eastmoney_fetcher.py --type market_performance - 历史市场表现' },
+                    { value: 'eastmoney_fetcher.py --type industry_valuation', label: 'eastmoney_fetcher.py --type industry_valuation - 行业估值排名' },
+                    { value: 'eastmoney_fetcher.py --type industry_peers', label: 'eastmoney_fetcher.py --type industry_peers - 同行业公司对比' },
+                    { value: 'eastmoney_fetcher.py --type industry_growth', label: 'eastmoney_fetcher.py --type industry_growth - 行业成长能力排名' },
+                    { value: 'eastmoney_fetcher.py --type dupont', label: 'eastmoney_fetcher.py --type dupont - 杜邦分析行业排名' },
+                    { value: 'data_collector.py', label: 'data_collector.py - 通用数据收集器' },
+                    { value: 'em_financial_collector.py', label: 'em_financial_collector.py - 东方财富财务数据' },
+                    { value: 'important_missing_data_collector.py', label: 'important_missing_data_collector.py - 重要缺失数据' },
+                    { value: 'check_data_updates.py', label: 'check_data_updates.py - 统一数据更新检查' }
+                ];
+            }
+            
+            // 添加程序选项
+            programs.forEach(program => {
+                const option = document.createElement('option');
+                option.value = program.value;
+                option.textContent = program.label;
+                programSelect.appendChild(option);
+            });
+        }
+        
+        function executeSingleFunction() {
+            const category = document.getElementById('function-category').value;
+            const program = document.getElementById('program-select').value;
+            const stockCode = document.getElementById('single-function-stock-code').value.trim();
+            
+            if (!stockCode || stockCode.length !== 6 || !/^\d+$/.test(stockCode)) {
+                alert('请输入6位数字的股票代码');
+                return;
+            }
+            
+            // 显示加载状态
+            document.getElementById('single-function-result').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
+            
+            fetch('/api/execute_single_function', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    category: category, 
+                    program: program, 
+                    stock_code: stockCode 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 尝试渲染Markdown格式
+                    try {
+                        const markdownOutput = marked.parse(data.output);
+                        document.getElementById('single-function-result').innerHTML = `<div class="alert alert-success">程序执行成功</div><div class="markdown-body">${markdownOutput}</div>`;
+                    } catch (e) {
+                        // 如果渲染失败，使用原始文本
+                        document.getElementById('single-function-result').innerHTML = `<div class="alert alert-success">程序执行成功</div><pre>${data.output}</pre>`;
+                    }
+                } else {
+                    // 错误信息也尝试渲染Markdown
+                    try {
+                        const markdownError = marked.parse(data.error);
+                        document.getElementById('single-function-result').innerHTML = `<div class="alert alert-danger">${data.message}</div><div class="markdown-body">${markdownError}</div>`;
+                    } catch (e) {
+                        // 如果渲染失败，使用原始文本
+                        document.getElementById('single-function-result').innerHTML = `<div class="alert alert-danger">${data.message}</div><pre>${data.error}</pre>`;
+                    }
+                }
+            })
+            .catch(error => {
+                document.getElementById('single-function-result').innerHTML = `<div class="alert alert-danger">执行失败：${error.message}</div>`;
+            });
+        }
+        
+        // 策略回测相关函数
+        function showBacktestPage() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'block';
+            
+            // 加载已有的监控报告和股票列表
+            loadBacktestReport();
+            loadBacktestStockList();
+        }
+        
+        function runBacktest() {
+            // 获取用户选择的回测模式
+            const backtestMode = document.querySelector('input[name="backtest-mode"]:checked').value;
+            const skipDataUpdate = backtestMode === 'quick';
+            
+            // 获取用户选择的策略版本
+            const useSimplified = document.getElementById('use-simplified').checked;
+            
+            // 显示任务状态
+            document.getElementById('backtest-task-status').style.display = 'block';
+            document.getElementById('backtest-status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
+            
+            // 发送回测请求
+            fetch('/api/backtest/run_backtest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    skip_data_update: skipDataUpdate,
+                    use_simplified: useSimplified
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    pollBacktestStatus(data.task_id);
+                } else {
+                    document.getElementById('backtest-status-content').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('backtest-status-content').innerHTML = `<div class="alert alert-danger">请求失败：${error.message}</div>`;
+            });
+        }
+        
+        function pollBacktestStatus(taskId) {
+            const statusContent = document.getElementById('backtest-status-content');
+            
+            fetch(`/api/backtest/task_status/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'running') {
+                    let progress = data.progress || 0;
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-dark" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">${progress}%</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 500px; overflow-y: auto;" id="backtest-message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        const messageContainer = document.getElementById('backtest-message-container');
+                        if (messageContainer) {
+                            messageContainer.scrollTop = messageContainer.scrollHeight;
+                        }
+                    }, 100);
+                    setTimeout(() => pollBacktestStatus(taskId), 2000);
+                } else if (data.status === 'completed') {
+                    statusContent.innerHTML = `<div class="alert alert-success">回测完成！</div>`;
+                    setTimeout(() => {
+                        document.getElementById('backtest-task-status').style.display = 'none';
+                        loadBacktestReport();
+                        loadBacktestStockList();
+                    }, 1000);
+                } else if (data.status === 'failed') {
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `<div class="alert alert-danger">回测失败：<br>${messageHtml}</div>`;
+                } else if (data.status === 'pending') {
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-dark" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">等待处理...</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 500px; overflow-y: auto;" id="backtest-message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    setTimeout(() => pollBacktestStatus(taskId), 2000);
+                } else {
+                    statusContent.innerHTML = `<div class="alert alert-warning">任务不存在</div>`;
+                }
+            })
+            .catch(error => {
+                statusContent.innerHTML = `<div class="alert alert-danger">获取状态失败：${error.message}</div>`;
+            });
+        }
+        
+        function loadBacktestReport() {
+            fetch('/api/backtest/get_report')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const htmlContent = marked.parse(data.content);
+                    document.getElementById('backtest-report-content').innerHTML = `<div class="markdown-body">${htmlContent}</div>`;
+                    document.getElementById('backtest-report').style.display = 'block';
+                } else {
+                    document.getElementById('backtest-report-content').innerHTML = `<div class="alert alert-info">${data.message}</div>`;
+                    document.getElementById('backtest-report').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                document.getElementById('backtest-report-content').innerHTML = `<div class="alert alert-danger">加载报告失败：${error.message}</div>`;
+            });
+        }
+        
+        function loadBacktestStockList() {
+            fetch('/api/backtest/get_stock_list')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let stocksHtml = '';
+                    if (data.stocks.length === 0) {
+                        stocksHtml = '<div class="alert alert-info">暂无回测数据</div>';
+                    } else {
+                        stocksHtml = '<div class="row">';
+                        data.stocks.forEach(stock => {
+                            stocksHtml += `
+                                <div class="col-md-3 mb-3">
+                                    <div class="card" style="cursor: pointer;" onclick="viewBacktestChart('${stock.chart_path}')">
+                                        <div class="card-body text-center">
+                                            <h6>${stock.ticker}</h6>
+                                            <p class="text-muted small">点击查看回测图表</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        stocksHtml += '</div>';
+                    }
+                    document.getElementById('backtest-stocks-container').innerHTML = stocksHtml;
+                    document.getElementById('backtest-stock-list').style.display = 'block';
+                } else {
+                    document.getElementById('backtest-stocks-container').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('backtest-stocks-container').innerHTML = `<div class="alert alert-danger">加载股票列表失败：${error.message}</div>`;
+            });
+        }
+        
+        function viewBacktestChart(chartPath) {
+            const imgUrl = `/api/backtest/get_chart/${chartPath}`;
+            document.getElementById('chartImage').src = imgUrl;
+            document.getElementById('chartModalLabel').textContent = chartPath.split('/')[0] + ' 回测图表';
+            
+            const modal = new bootstrap.Modal(document.getElementById('chartModal'));
+            modal.show();
         }
     </script>
 </body>
