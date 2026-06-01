@@ -1,27 +1,181 @@
 # GP_ANA — A 股 AI 综合分析系统
 
-> **GP_ANA** 是一款全流程量化投资与 AI 分析系统。基于 akshare / yfinance 实现多维数据采集，集成 TA-Lib 技术指标计算与策略回测优化，内置 Flask Web 可视化界面。核心集成本地 Ollama AI 与外部大模型 API（OpenAI / DeepSeek / 通义千问等），支持五维度分析引擎与两层决策系统，覆盖多股票批量处理与自动化任务调度。是量化研究与 AI 辅助决策的理想实践平台。
+> **从数据到决策，一站式的量化投资与 AI 辅助分析平台。**
 >
-> **数据采集 → 技术指标 → 策略回测 → AI 多维分析 → 两层决策 → Web 可视化**
+> 多维数据采集 → 技术指标计算 → 策略回测优化 → 五维度 AI 分析 → 两层决策引擎 → **丰富可视化呈现**
 
 **当前版本：v1.2.0**
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/AI-Ollama%20%7C%20OpenAI%20%7C%20DeepSeek-orange.svg" alt="AI">
+</p>
+
+---
+
+## 🖥️ 界面预览
+
+### Web 主界面
+![主界面](assets/screenshots/主界面.png)
+
+### 分析报告列表
+![报告列表](assets/screenshots/报告列表.png)
+
+### 分析报告细则
+![报告细则](assets/screenshots/报告细则.png)
+
+### 策略回测
+![策略回测](assets/screenshots/策略回测.png)
+
+---
+
+## ✨ 为什么选择 GP_ANA？
+
+| 特性 | 传统炒股软件 | **GP_ANA** |
+|:---|:---|:---|
+| 数据来源 | 单一平台 | **20+ 采集器**，东方财富/akshare/雪球多源融合 |
+| 分析维度 | 仅 K 线 | **五大维度**：财务 + 情绪估值 + 技术趋势 + 股东结构 + 研报观点 |
+| AI 决策 | ❌ | ✅ **两层 AI 决策**：冲突检测 + 交易计划，支持 Ollama/OpenAI/DeepSeek |
+| 策略验证 | 手动复盘 | **自动回测**，趋势跟踪/均值回归/波段三种策略 |
+| 可视化 | 固定模板 | **20+ 种专业图表**，价格/成交量/布林带/相关性/信号分析/趋势通道... |
+| 批量处理 | 逐个操作 | **一键批量**分析多只股票 |
+
+---
+
+## 📊 可视化能力
+
+GP_ANA 为每只股票自动生成 **20+ 种专业级分析图表**，无需任何配置：
+
+### 市场数据可视化
+
+| 图表类型 | 文件名示例 | 说明 |
+|:---|:---|:---|
+| 🕯️ **价格成交量** | `price_volume.png` | K 线 + 成交量柱状图 + 均线系统 |
+| 📈 **技术指标面板** | `technical_indicators.png` | 多面板展示 MA/RSI/MACD/KDJ/CCI/ROC/WR 等 16 项指标 |
+| 🎚️ **布林带** | `bollinger_bands.png` | 布林带 + 价格走势，识别超买超卖 |
+| 🔗 **相关性热力图** | `correlation.png` | 全部技术指标相关性矩阵 |
+
+### 策略与信号
+
+| 图表类型 | 文件名示例 | 说明 |
+|:---|:---|:---|
+| 📡 **信号分析** | `signal_analysis.png` | 各技术指标的买卖信号分布与有效性评估 |
+| 📊 **策略回测结果** | `strategy_results.png` | 资金曲线 + 买卖点标注 + 收益率/夏普比率/最大回撤 |
+| 🏔️ **支撑阻力位** | `support_resistance.png` | AI 识别的关键支撑/阻力位，含成交密集区 |
+| 📐 **趋势通道** | `trend_channel_results.png` | 自动检测趋势通道，标记突破/回归信号 |
+
+### AI 预测
+
+| 图表类型 | 文件名示例 | 说明 |
+|:---|:---|:---|
+| 🔮 **AI 价格预测** | `ai_predictions.png` | 机器学习模型对未来 N 日价格预测 |
+| ⭐ **特征重要性** | `feature_importance.png` | 各技术指标对预测的贡献度排序 |
+| 🧠 **AI 综合预测** | `prediction.png` | LLM 增强的综合趋势预判 |
+
+### 回测系统
+
+| 图表类型 | 文件名示例 | 说明 |
+|:---|:---|:---|
+| 📈 **回测收益曲线** | `backtest_YYYYMMDD.png` | 每次回测的完整收益曲线 + 交易标记 |
+
+> 所有图表自动保存至 `./data/{ticker}/` 目录，既可在 Web 界面在线查看，也可导出用于报告。
 
 ---
 
 ## 🎯 核心能力
 
-| 能力 | 说明 |
-|------|------|
-| 📡 **数据采集** | 20+ 采集器，覆盖行情、财务、资金流、融资融券、股东、行业、研报等 |
-| 📊 **多维分析** | 财务质量、资金流向、融资融券、估值水平、技术趋势、股东结构、同行对比、研报观点 — 八大维度 |
-| 🧠 **AI 决策** | 五维度 JSON 摘要 + 两层决策引擎（冲突检测 → 交易计划），3 种策略模式（趋势跟踪/波段/均值回归） |
-| 📈 **策略回测** | 趋势跟踪回测系统，含信号去重、实际执行追踪、多股票批量回测 |
-| 🌐 **Web 界面** | Flask Web UI（localhost:8081），完整分析 / 快速分析 / 回测 / 交易记录管理，一站式操作 |
-| 🔧 **统一入口** | `eastmoney_fetcher.py` 统一数据抓取，`batch_analyze.py --mode` 统一批量分析 |
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     📡 数据采集层                              │
+│   20+ 采集器：行情 / 财务 / 资金流 / 融资融券 / 股东 / 行业 / 研报   │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     🔬 五维度分析引擎                           │
+│   财务(25%) + 情绪估值(15%) + 技术趋势(40%)                     │
+│   + 股东结构(10%) + 研报观点(10%)                               │
+│   每个维度 → 结构化 JSON → LLM 深度分析                         │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     🧠 两层 AI 决策                            │
+│   第一层：五维度冲突检测 → 识别多空矛盾信号                       │
+│   第二层：结合持仓信息 → 生成具体交易计划（买入/卖出/持有）          │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│              📊 可视化 & 📈 策略回测 & 🌐 Web 界面               │
+│   20+ 图表 / 3 种策略模式 / Flask Web UI (localhost:8081)       │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 程序分类
+## 🚀 快速开始
+
+### 1. 环境准备
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 安装 Ollama（本地 AI 分析）
+# 访问 https://ollama.com 下载安装
+ollama pull qwen3
+
+# 复制配置文件
+cp config.example.py config.py
+```
+
+### 2. 启动 Web 界面
+
+```bash
+python web_ui.py
+# 浏览器打开 → http://localhost:8081
+```
+
+### 3. 开始分析
+
+| 模式 | 操作 | 耗时 | 适用场景 |
+|:---|:---|:---|:---|
+| 🔍 **完整分析** | 点击"完整分析"，输入股票代码 | 3-5 分钟 | 新股票，首次全面评估 |
+| ⚡ **快速分析** | 点击"快速分析"，选择策略视角 | 30 秒 | 每日盘后快速复盘 |
+| 📊 **策略回测** | 点击"回测"，选择策略参数 | 1-2 分钟 | 验证交易策略有效性 |
+
+---
+
+## ⚙️ 配置
+
+```python
+# config.py — 核心配置
+STOCK_TICKERS = {
+    'your_stock': '002594.SZ',   # 添加你要跟踪的股票
+}
+
+AI_CONFIG = {
+    'base_url': 'http://localhost:11434',  # Ollama 本地服务
+    'model': 'qwen3',                       # 本地模型
+    'trading_strategy': 'neutral',          # trend_following / mean_reversion / swing / neutral
+    'fallback_models': ['qwen3'],           # 备用模型
+}
+```
+
+---
+
+## 📦 依赖项
+
+```
+pandas  numpy  matplotlib  seaborn  yfinance  akshare
+TA-Lib  scikit-learn  schedule  requests  flask
+```
+
+---
+
+## 📂 程序分类
+
+> 以下是完整的模块清单，供查阅参考。
 
 ### 1. 数据抓取类
 
@@ -40,7 +194,6 @@
 | `important_missing_data_collector.py` | 业绩预告与分红数据 | 多数据源 | `{ticker}_performance_forecast.csv` / `_ex_dividend.csv` |
 | `shenwan_industry_collector.py` | 申万行业分类 | 东方财富 API | `{ticker}_industry_info.json` |
 | `batch_margin_collector.py` ⭐ | 批量融资融券数据采集 | akshare | 多股票 `_margin_data.csv` |
-| `index_data_collector.py` | 指数数据采集 | akshare | 指数数据文件 |
 
 ### 2. 数据分析类
 
@@ -57,10 +210,10 @@
 | `analyze_performance_forecast.py` | 业绩预测 AI 分析 | 业绩预测分析报告 |
 | `analyze_peer_comparison.py` | 同行对比 AI 分析 | 同行对比分析报告 |
 | `calculate_financial_indicators.py` | 综合财务指标计算（盈利能力/偿债能力/运营能力/现金流/成长能力） | `{ticker}_financial_indicators_calculated.json` |
-| `calculate_technical_trend_ds.py` ⭐ | DeepSeek 技术趋势分析 | 技术趋势分析数据 |
+| `calculate_technical_trend_ds.py` ⭐ | 技术趋势分析计算 | 技术趋势分析数据 |
 | `daily/data_analysis.py` | 数据质量检查 + 可视化（16 项指标含 OBV/ATR/ADX/MFI） | 价格/成交量/布林带/相关性图表 |
 | `daily/technical_analysis.py` | 技术指标信号分析与有效性评估 | 信号分析图表 |
-| `daily/quantitative_strategy.py` | 量化策略回测（含信号去重） | 策略回测图表 + 交易信号 CSV |
+| `daily/quantitative_strategy.py` | 量化策略回测 | 策略回测图表 + 交易信号 CSV |
 | `daily/strategy_optimization.py` | 策略参数优化 | 优化结果图表 |
 | `daily/trend_channel_analyzer.py` | 趋势通道分析 | 趋势通道图表 + 信号 CSV |
 | `daily/stock_quantitative_analyzer.py` | 股票量化综合分析 | 分析 CSV + 图表 |
@@ -76,16 +229,15 @@
 | `Process/sentiment_valuation_analyzer.py` | 情绪 + 估值 → JSON（市场情绪/估值分位/技术情绪） |
 | `Process/shareholder_structure_analyzer.py` | 股东结构 → JSON（集中度/机构动向/北向资金） |
 | `Process/research_report_analyzer.py` | 研报观点 → JSON（评级分布/目标价/关键观点） |
-| `Process/financial_analysis_enhancer.py` | 财务深度增强分析 |
-| `Process/multi_strategy_analyzer.py` | 多策略 LLM 分析（趋势跟踪/均值回归/波段） |
 | `Process/two_layer_decision_analyzer.py` | **两层决策** — 冲突检测 + 持仓交易计划 |
+| `Process/multi_strategy_analyzer.py` | 多策略 LLM 分析（趋势跟踪/均值回归/波段） |
 
 ### 4. AI / LLM 分析类
 
 | 程序名称 | 功能 |
 |---------|------|
 | `stock_ai_comprehensive_analyzer.py` | 综合各维度分析报告 → AI 大模型综合分析（支持本地 Ollama / 第三方 API） |
-| `daily/stock_ai_local_analyzer.py` | K 线数据 → AI 日线分析 |
+| `daily/stock_ai_local_analyzer.py` | K 线数据 → AI 日线分析 + 支撑阻力位图表 |
 | `weekly/weekly_stock_ai_local_analyzer.py` | 周线数据 → AI 周线分析 |
 
 ### 5. 回测系统 ⭐
@@ -107,55 +259,17 @@
 | `api/trading.py` | 交易记录管理 API |
 | `api/report_viewer.py` | 报告查看 API |
 | `api/common.py` ⭐ | 共享模块（交易所映射、任务队列、步骤执行引擎） |
-| `report_viewer.py` | 独立报告查看器 |
+
+### 7. 配置文件
+
+| 文件名 | 功能 |
+|-------|------|
+| `config.py` | 系统配置（股票代码、AI模型、技术指标参数、策略参数） |
+| `requirements.txt` | Python 依赖包列表 |
 
 ---
 
-## 🚀 快速开始
-
-### 环境要求
-
-- Python 3.9+
-- [Ollama](https://ollama.com/)（本地 AI 分析）
-- TA-Lib（技术指标计算）
-
-### 安装
-
-```bash
-pip install -r requirements.txt
-cp config.example.py config.py  # 编辑 config.py 填入你的配置
-```
-
-### Web 界面使用（推荐）
-
-```bash
-python web_ui.py
-# 打开浏览器访问 http://localhost:8081
-```
-
-**三种分析模式：**
-
-| 模式 | 说明 | 适用场景 |
-|------|------|---------|
-| 🔍 **完整分析** | 全量数据采集 + 五维度 + 两层决策 | 新股票初始化 |
-| ⚡ **快速分析** | 仅 K 线 + 技术趋势 | 每日盘后快速查看 |
-| 📊 **回测** | 趋势跟踪策略回测 | 验证交易策略 |
-
----
-
-## 执行流程
-
-### 完整分析（新股票初始化）
-```
-数据采集 (16 步) → 技术指标计算 → 五维度 JSON 摘要 → 两层决策 → 综合报告
-```
-
-### 快速分析（每日更新）
-```
-日更数据更新 → 技术趋势计算 → 技术趋势 AI 分析（3 种策略视角可选）
-```
-
-### 命令行使用
+## 命令行使用
 
 ```bash
 # 统一批量分析
@@ -177,60 +291,6 @@ python analyze_technical_trend.py --strategy swing --ticker 300433.SZ
 
 ---
 
-## 配置
-
-编辑 `config.py`（从 `config.example.py` 复制）：
-
-```python
-# 股票代码
-STOCK_TICKERS = {
-    'example': '002594.SZ',
-}
-
-# AI 模型配置（支持本地 Ollama 或第三方 API）
-AI_CONFIG = {
-    # 本地 Ollama（默认）
-    'base_url': 'http://localhost:11434',
-    'model': 'qwen3.6:35b-a3b-coding-nvfp4',
-    'temperature': 0.3,
-    'max_tokens': 8192,
-    'trading_strategy': 'neutral',          # trend_following / mean_reversion / swing / neutral
-    'fallback_models': ['qwen3.6:35b-a3b-coding-nvfp4'],
-    # 第三方 API（可选，兼容 OpenAI / DeepSeek / 通义千问等）
-    # 'external_api': {
-    #     'enabled': True,
-    #     'api_key': 'your-api-key',
-    #     'api_url': 'https://api.openai.com/v1',
-    #     'model': 'gpt-4o',
-    # },
-}
-
-# 交易记录（在 trading_records.py 中定义）
-from trading_records import TRADING_RECORDS
-```
-
----
-
-## 依赖项
-
-```
-pandas, numpy, matplotlib, seaborn, yfinance, akshare, TA-Lib,
-scikit-learn, schedule, requests, flask
-```
-
----
-
-## 注意事项
-
-- 国内股票优先使用 akshare 数据源
-- 技术指标计算需要 TA-Lib 库支持
-- 本地 AI 分析需要部署 Ollama 服务
-- 所有数据采集程序采用增量保存，避免数据丢失
-- 数据文件存储在 `./data/{ticker}/` 目录下
-- `config.py` 和 `trading_records.py` 包含敏感信息，已加入 `.gitignore`
-
----
-
 ## 版本历史
 
 | 版本 | 日期 | 主要变更 |
@@ -240,3 +300,20 @@ scikit-learn, schedule, requests, flask
 | v1.0.1 | 2026-02 | 18 模块：数据采集 + 基础分析 |
 
 详见 [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## 注意事项
+
+- 国内股票优先使用 akshare 数据源
+- 技术指标计算需要 TA-Lib 库支持
+- 本地 AI 分析需要部署 [Ollama](https://ollama.com/) 服务
+- 所有数据采集程序采用增量保存，避免数据丢失
+- 数据文件存储在 `./data/{ticker}/` 目录下
+- `config.py` 和 `trading_records.py` 包含敏感信息，已加入 `.gitignore`
+
+---
+
+<p align="center">
+  <sub>Made with ❤️ for quantitative investors</sub>
+</p>
