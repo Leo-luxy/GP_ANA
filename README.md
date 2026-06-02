@@ -232,6 +232,11 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | `daily/strategy_optimization.py` | 策略参数优化 | 优化结果图表 |
 | `daily/trend_channel_analyzer.py` | 趋势通道分析 | 趋势通道图表 + 信号 CSV |
 | `daily/stock_quantitative_analyzer.py` | 股票量化综合分析 | 分析 CSV + 图表 |
+| `daily/ai_model.py` | AI 预测模型训练与推理 | AI 模型文件 |
+| `daily/stock_prediction.py` | 股票价格预测 | 预测结果图表 |
+| `daily/stock_daily_indicator_calculator.py` | 日线综合指标计算 | `{ticker}_daily_indicators.csv` |
+| `daily/daily_strategy_optimization_multistock.py` | 多股票策略参数优化 | 优化结果 CSV + 图表 |
+| `daily/daily_trend_strategy.py` | 日线趋势跟踪策略 | 策略信号 CSV |
 | `weekly/` | 周线分析（数据检查/策略回测/优化/综合分析/AI预测） | 周线分析报告 |
 
 ### 3. Process/ 分析引擎 ⭐ (v1.2 新增)
@@ -246,6 +251,7 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | `Process/research_report_analyzer.py` | 研报观点 → JSON（评级分布/目标价/关键观点） |
 | `Process/two_layer_decision_analyzer.py` | **两层决策** — 冲突检测 + 持仓交易计划 |
 | `Process/multi_strategy_analyzer.py` | 多策略 LLM 分析（趋势跟踪/均值回归/波段） |
+| `Process/financial_analysis_enhancer.py` | 财务分析增强 — 深度解读财务指标关联与异常 |
 
 ### 4. AI / LLM 分析类
 
@@ -275,12 +281,14 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | `api/report_viewer.py` | 报告查看 API |
 | `api/common.py` ⭐ | 共享模块（交易所映射、任务队列、步骤执行引擎） |
 
-### 7. 配置文件
+### 7. 工具 & 配置
 
 | 文件名 | 功能 |
 |-------|------|
 | `config.py` | 系统配置（股票代码、AI模型、技术指标参数、策略参数） |
 | `requirements.txt` | Python 依赖包列表 |
+| `utils.py` | 通用工具函数（日期处理、文件操作、日志等） |
+| `check_data_updates.py` | 统一数据更新检查（`--mode daily\|periodic`） |
 
 ---
 
