@@ -52,7 +52,7 @@ def get_all_steps(stock_code):
             ("融资融券分析", f"python analyze_margin_data.py --ticker {stock_code}"),
             ("估值分析", f"python analyze_valuation_data.py --ticker {stock_code}"),
             ("研究报告分析", f"python analyze_research_reports.py --ticker {stock_code}"),
-            # v1.2 Process 模块（JSON 摘要）
+            # V3 Process 模块（JSON 摘要）
             ("计算技术趋势数据", f"python calculate_technical_trend_ds.py --ticker {stock_code}"),
             ("生成财务结构化JSON", f"python Process/financial_structured_analyzer.py --ticker {stock_code}"),
             ("生成情绪估值JSON", f"python Process/sentiment_valuation_analyzer.py --ticker {stock_code}"),
@@ -68,10 +68,10 @@ def get_all_steps(stock_code):
             ("股东结构分析", f"python analyze_shareholder_structure.py --ticker {stock_code}"),
         ],
         'periodic': [
+            # 与 V3 batch_analyze_periodic.py 完全一致的 3 步
             ("财务报表分析", f"python analyze_financial_statements.py --ticker {stock_code}"),
-            ("业绩预告与分红分析", f"python analyze_performance_forecast.py --ticker {stock_code}"),
-            ("股东结构分析", f"python analyze_shareholder_structure.py --ticker {stock_code}"),
-            ("同行比较分析", f"python analyze_peer_comparison.py --ticker {stock_code}"),
+            ("研究报告分析", f"python analyze_research_reports.py --ticker {stock_code}"),
+            ("东方财富财务分析", f"python analyze_em_financial.py --ticker {stock_code}"),
         ],
     }
 

@@ -138,6 +138,17 @@ def run_analysis_task(task_id: str, stock_code: str, task_type: str):
             ('[采集] 申万行业', f'python shenwan_industry_collector.py --ticker {full_stock_code}'),
             # --- 技术指标 ---
             ('[计算] 技术趋势数据', f'python calculate_technical_trend_ds.py --ticker {full_stock_code}'),
+            # --- 各方面详细分析报告（MD） ---
+            ('[分析] 财务报表分析', f'python analyze_financial_statements.py --ticker {full_stock_code}'),
+            ('[分析] 研报分析', f'python analyze_research_reports.py --ticker {full_stock_code}'),
+            ('[分析] 东方财富财务分析', f'python analyze_em_financial.py --ticker {full_stock_code}'),
+            ('[分析] 业绩预告与分红分析', f'python analyze_performance_forecast.py --ticker {full_stock_code}'),
+            ('[分析] 股东结构分析', f'python analyze_shareholder_structure.py --ticker {full_stock_code}'),
+            ('[分析] 同行对比分析', f'python analyze_peer_comparison.py --ticker {full_stock_code}'),
+            ('[分析] 资金流向分析', f'python analyze_fund_flow.py --ticker {full_stock_code}'),
+            ('[分析] 融资融券分析', f'python analyze_margin_data.py --ticker {full_stock_code}'),
+            ('[分析] 估值分析', f'python analyze_valuation_data.py --ticker {full_stock_code}'),
+            ('[分析] 技术趋势AI分析', f'python analyze_technical_trend.py --ticker {full_stock_code}'),
             # --- 五维度 JSON 摘要 ---
             ('[摘要] 财务结构化', f'python Process/financial_structured_analyzer.py --ticker {full_stock_code}'),
             ('[摘要] 情绪估值', f'python Process/sentiment_valuation_analyzer.py --ticker {full_stock_code}'),
@@ -145,6 +156,8 @@ def run_analysis_task(task_id: str, stock_code: str, task_type: str):
             ('[摘要] 研报观点', f'python Process/research_report_analyzer.py --ticker {full_stock_code}'),
             # --- 两层决策（五维度冲突检测 + 交易计划） ---
             ('[决策] 五维度两层决策', f'python Process/two_layer_decision_analyzer.py --ticker {full_stock_code}'),
+            # --- AI 综合分析 ---
+            ('[综合] AI综合分析', f'python stock_ai_comprehensive_analyzer.py --ticker {full_stock_code}'),
         ]
 
         _execute_steps(task_id, full_stock_code, steps, label)

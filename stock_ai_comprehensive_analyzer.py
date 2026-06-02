@@ -66,8 +66,6 @@ class StockAIComprehensiveAnalyzer:
         
         return self.ticker
     
-
-    
     def get_stock_info(self):
         """从company_basic.json文件中获取股票基本信息"""
         stock_info = {
@@ -108,7 +106,7 @@ class StockAIComprehensiveAnalyzer:
                 basic_info = data['basic_info']
                 # 映射字段
                 stock_info['name'] = basic_info.get('公司简称', '')
-                stock_info['industry'] = basic_info.get('所属行业', '')
+                stock_info['industry'] = basic_info.get('板块名称层级', '')
                 stock_info['main_business'] = basic_info.get('主营业务', '')
                 stock_info['full_name'] = basic_info.get('公司全称', '')
                 stock_info['registered_capital'] = basic_info.get('注册资本', '')
@@ -437,46 +435,6 @@ class StockAIComprehensiveAnalyzer:
         
         # 添加技术趋势分析
         # 暂时屏蔽技术趋势分析文本内容的生成，避免与JSON部分重复
-        # if analysis_reports.get('technical_trend'):
-        #     prompt += "\n=== 技术趋势分析 ===\n"
-        #     technical_trend = analysis_reports['technical_trend']
-        #     if 'indicator_trends' in technical_trend:
-        #         for indicator, trend in technical_trend['indicator_trends'].items():
-        #             prompt += f"- {indicator}: {trend}\n"
-        #     if 'technical_indicators' in technical_trend:
-        #         prompt += "\n技术指标最新值:\n"
-        #         for indicator, value in technical_trend['technical_indicators'].items():
-        #             prompt += f"- {indicator}: {value}\n"
-        #     if 'trend_confidence' in technical_trend:
-        #         prompt += "\n趋势信心度:\n"
-        #         for trend, confidence in technical_trend['trend_confidence'].items():
-        #             prompt += f"- {trend}: {confidence}\n"
-        #     if 'trading_signal' in technical_trend:
-        #         prompt += "\n交易信号:\n"
-        #         trading_signal = technical_trend['trading_signal']
-        #         prompt += f"- 操作: {trading_signal.get('action', 'N/A')}\n"
-        #         prompt += f"- 信心度: {trading_signal.get('confidence', 'N/A')}\n"
-        #         prompt += f"- 理由: {trading_signal.get('reason', 'N/A')}\n"
-        #     if 'signal_conflicts' in technical_trend:
-        #         prompt += "\n信号冲突:\n"
-        #         for conflict in technical_trend['signal_conflicts']:
-        #             prompt += f"- {conflict}\n"
-        #     if 'risk_metrics' in technical_trend:
-        #         prompt += "\n风险指标:\n"
-        #         for metric, value in technical_trend['risk_metrics'].items():
-        #             prompt += f"- {metric}: {value}\n"
-        #     if 'price_action' in technical_trend and 'volatility_regime' in technical_trend['price_action']:
-        #         prompt += f"\n波动率状态: {technical_trend['price_action']['volatility_regime']}\n"
-        #     if 'multi_timeframe' in technical_trend:
-        #         prompt += "\n多周期趋势:\n"
-        #         multi_timeframe = technical_trend['multi_timeframe']
-        #         prompt += f"- 周线趋势: {multi_timeframe.get('weekly_trend', 'N/A')}\n"
-        #         prompt += f"- 日线趋势: {multi_timeframe.get('daily_trend', 'N/A')}\n"
-        #         prompt += f"- 背离: {multi_timeframe.get('divergence', 'N/A')}\n"
-        #     if 'consistency_score' in technical_trend:
-        #         prompt += f"\n指标一致性评分: {technical_trend['consistency_score']}\n"
-        #     if 'market_snapshot' in technical_trend:
-        #         prompt += f"\n市场快照: {technical_trend['market_snapshot']}\n"
         
         # 添加股票财务分析
         if analysis_reports.get('eastmoney_financial'):
@@ -521,10 +479,45 @@ class StockAIComprehensiveAnalyzer:
         # 添加交易记录信息
         prompt += "\n=== 交易记录 ===\n"
         if self.ticker in TRADING_RECORDS:
+            # 预处理交易记录，计算持仓信息
+            total_shares = 0
+            total_cost = 0
+            buy_operations = 0
+            sell_operations = 0
+            
             for operation in TRADING_RECORDS[self.ticker]:
                 prompt += f"- 日期: {operation['date']}, 类型: {operation['type']}, 价格: {operation['price']}, 数量: {operation['shares']}\n"
+                
+                if operation['type'] == 'buy':
+                    total_shares += operation['shares']
+                    total_cost += operation['price'] * operation['shares']
+                    buy_operations += 1
+                elif operation['type'] == 'sell':
+                    total_shares -= operation['shares']
+                    total_cost -= operation['price'] * operation['shares']
+                    sell_operations += 1
+            
+            # 计算持仓成本
+            avg_cost = 0
+            if total_shares > 0:
+                avg_cost = total_cost / total_shares
+            
+            # 添加持仓信息
+            prompt += f"\n=== 持仓信息 ===\n"
+            prompt += f"- 持仓数量: {total_shares} 股\n"
+            if total_shares > 0:
+                prompt += f"- 持仓成本: {avg_cost:.2f} 元\n"
+            else:
+                prompt += f"- 持仓成本: 0 元\n"
+            prompt += f"- 买入操作: {buy_operations} 次\n"
+            prompt += f"- 卖出操作: {sell_operations} 次\n"
         else:
             prompt += "暂无持仓及交易\n"
+            prompt += "\n=== 持仓信息 ===\n"
+            prompt += "- 持仓数量: 0 股\n"
+            prompt += "- 持仓成本: 0 元\n"
+            prompt += "- 买入操作: 0 次\n"
+            prompt += "- 卖出操作: 0 次\n"
         
         # 添加分析要求
         prompt += """\n=== 综合分析要求 ===\n请基于以上所有数据和分析报告，提供以下内容：\n1. 股票当前技术面分析（趋势、动量、量能等）\n2. 支撑位和阻力位的有效性分析\n3. 针对当前持仓的具体操作建议\n4. 短期（1-2周）和中期（1-3个月）市场展望\n5. 具体的买入/卖出点位建议和止损止盈设置\n6. 风险评估和资金管理建议\n7. 结合公司基本信息和行业情况的分析\n8. 基于财报数据的财务状况分析\n9. 基于资金流数据的市场情绪分析\n10. 基于融资融券数据的多空力量分析\n11. 基于估值数据的投资价值分析\n12. 基于东方财富财务数据的深度财务分析\n13. 基于业绩预告与分红数据的盈利预期分析\n14. 基于股东结构数据的股权结构分析\n15. 基于研究报告数据的机构观点分析\n16. 综合所有分析报告的结论，给出最终的投资建议\n\n请提供详细、专业的分析，基于数据和技术指标，避免泛泛而谈。"""
@@ -553,7 +546,7 @@ class StockAIComprehensiveAnalyzer:
                 ],
                 options={
                     "temperature": temperature,  # 降低随机性，提高准确性
-                    "max_tokens": max_tokens*3  # 足够的响应长度
+                    "max_tokens": max_tokens  # 足够的响应长度
                 }
             )
             
@@ -585,10 +578,12 @@ class StockAIComprehensiveAnalyzer:
         analysis_date = datetime.now().strftime('%Y-%m-%d')
         technical_indicators = {}
         
-        if hasattr(self, 'technical_trend_data') and self.technical_trend_data:
+        # 使用analysis_reports['technical_trend']作为唯一数据源，确保数据一致性
+        technical_trend = self.analysis_reports.get('technical_trend', {})
+        if technical_trend:
             # 获取当前价格
-            if 'technical_indicators' in self.technical_trend_data:
-                ti = self.technical_trend_data['technical_indicators']
+            if 'technical_indicators' in technical_trend:
+                ti = technical_trend['technical_indicators']
                 current_price = ti.get('close', 0)
                 # 构建技术指标字典
                 technical_indicators = {
@@ -606,8 +601,8 @@ class StockAIComprehensiveAnalyzer:
                     'ADX': round(ti.get('ADX', 0), 2)
                 }
             # 获取分析日期
-            if 'meta' in self.technical_trend_data:
-                analysis_date = self.technical_trend_data['meta'].get('last_data_date', analysis_date)
+            if 'meta' in technical_trend:
+                analysis_date = technical_trend['meta'].get('last_data_date', analysis_date)
         
         # 构建markdown内容
         md_content = f"""# {stock_info['name']} ({self.ticker}) 股票综合分析报告
@@ -621,18 +616,6 @@ class StockAIComprehensiveAnalyzer:
 - 所属行业: {stock_info['industry']}
 - 当前价格: {current_price:.2f} 元
 - 分析基准日期: {analysis_date}
-
-## 支撑位分析
-- 支撑位数据已从技术趋势分析JSON全文中获取
-
-## 阻力位分析
-- 阻力位数据已从技术趋势分析JSON全文中获取
-
-## 持仓情况
-- 持仓情况数据已从技术趋势分析JSON全文中获取
-
-## 近期操作记录
-- 近期操作记录数据已从技术趋势分析JSON全文中获取
 
 ## 技术指标数据
 """
@@ -781,8 +764,6 @@ class StockAIComprehensiveAnalyzer:
         
         print(f"综合分析报告已保存为: {file_path}")
         return file_path
-    
-
     
     def save_prompt_to_txt(self, prompt):
         """保存提示词相关内容到TXT文件"""
