@@ -1103,7 +1103,10 @@ def main():
     elif args.type == 'industry':
         if args.code:
             collector.collect_industry_board_daily(args.code, args.name)
-            collector.collect_industry_board_constituents(args.code)
+            # 只有 BK 开头的东方财富行业板块才支持成分股查询
+            # sh/sz 开头的指数代码不支持此 API，跳过
+            if args.code.startswith('BK'):
+                collector.collect_industry_board_constituents(args.code)
         else:
             collector.collect_industry_board_list()
             collector.collect_top_industry_boards(top_n=args.top)
