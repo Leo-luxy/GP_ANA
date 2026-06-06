@@ -112,7 +112,8 @@
             <button class="btn btn-info me-2" onclick="showDetailedMode()">详细模式</button>
             <button class="btn btn-warning me-2" onclick="showSingleFunction()">单功能执行</button>
             <button class="btn btn-danger me-2" onclick="showReportViewer()">报告查看</button>
-            <button class="btn btn-dark" onclick="showBacktestPage()">策略回测</button>
+            <button class="btn btn-dark me-2" onclick="showBacktestPage()">策略回测</button>
+            <button class="btn btn-outline-primary" onclick="showSectorAnalysis()">板块分析</button>
         </div>
         
         <!-- 完整分析页面 -->
@@ -443,8 +444,79 @@
                 <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
             </div>
         </div>
+
+    <!-- 板块分析页面 -->
+    <div class="card mt-4" id="sector-analysis-page" style="display: none;">
+        <div class="card-body">
+            <h5 class="card-title">板块分析 <span class="badge bg-info text-dark">AI</span></h5>
+            <p class="text-muted small">基于技术指标的本地 AI 深度分析 · 支持大盘指数 / 行业板块 / 港股指数</p>
+
+            <!-- 板块类型选择 -->
+            <div class="form-group mt-3">
+                <label class="form-label fw-bold">板块类型</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="sector-type" id="sector-broad-index" value="broad_index" checked onchange="onSectorTypeChange()">
+                    <label class="form-check-label" for="sector-broad-index">大盘指数</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="sector-type" id="sector-industry" value="industry" onchange="onSectorTypeChange()">
+                    <label class="form-check-label" for="sector-industry">行业板块</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="sector-type" id="sector-hk-index" value="hk_index" onchange="onSectorTypeChange()">
+                    <label class="form-check-label" for="sector-hk-index">港股指数</label>
+                </div>
+            </div>
+
+            <!-- 代码输入（手动输入备选：支持 BK代码 / 指数代码） -->
+            <div class="form-group mt-3" id="sector-code-input-group" style="display: none;">
+                <label for="sector-code-input" class="form-label fw-bold">📝 或手动输入代码</label>
+                <div class="input-group" style="max-width: 350px;">
+                    <input type="text" id="sector-code-input" class="form-control" placeholder="例如：sz399991 或 BK0478" maxlength="10">
+                    <button class="btn btn-outline-secondary" onclick="loadSectorList()" title="刷新板块列表">🔄</button>
+                </div>
+                <small class="text-muted">支持标准指数代码（sz399991 中证有色）或东方财富 BK 代码</small>
+            </div>
+
+            <!-- 板块下拉选择 -->
+            <div class="form-group mt-3" id="sector-selector-group">
+                <label for="sector-selector" class="form-label fw-bold">选择板块</label>
+                <select id="sector-selector" class="form-control" style="max-width: 400px;" onchange="onSectorSelectorChange()">
+                    <option value="">-- 请先加载板块列表 --</option>
+                </select>
+                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="loadSectorList()">🔄 刷新列表</button>
+            </div>
+
+            <!-- 按钮组 -->
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" onclick="startSectorAnalysis()">▶ 开始 AI 分析</button>
+                <button class="btn btn-outline-secondary" onclick="startSectorDataCollection()">⬇ 更新板块数据</button>
+                <button class="btn btn-secondary" onclick="showMainPage()">返回首页</button>
+            </div>
+
+            <!-- 任务状态 -->
+            <div id="sector-task-status" class="mt-4" style="display: none;">
+                <h5>任务状态</h5>
+                <div id="sector-status-content"></div>
+            </div>
+
+            <!-- 分析结果 -->
+            <div id="sector-report" class="mt-4" style="display: none;">
+                <h5>分析结果</h5>
+                <div id="sector-report-content" class="markdown-body"></div>
+            </div>
+
+            <!-- 历史报告 -->
+            <div class="mt-4">
+                <h6>📁 历史报告</h6>
+                <div id="sector-reports-container">
+                    <small class="text-muted">点击"开始 AI 分析"后自动刷新</small>
+                </div>
+            </div>
+        </div>
     </div>
-    
+    </div>
+
     <!-- 版本信息 -->
     <div class="container mt-4 mb-4">
         <div class="text-center text-muted">
@@ -460,6 +532,8 @@
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('main-page').style.display = 'block';
         }
         
@@ -469,6 +543,8 @@
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('quick-analysis').style.display = 'block';
         }
         
@@ -477,6 +553,9 @@
             document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('trading-records').style.display = 'block';
             loadTradingRecords();
         }
@@ -486,6 +565,9 @@
             document.getElementById('quick-analysis').style.display = 'none';
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'block';
         }
         
@@ -496,6 +578,8 @@
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('single-function').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'block';
             loadStocks();
         }
@@ -506,6 +590,8 @@
             document.getElementById('trading-records').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('single-function').style.display = 'block';
             updateProgramList();
         }
@@ -1206,8 +1292,9 @@
             document.getElementById('detailed-mode').style.display = 'none';
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'block';
-            
+
             // 加载已有的监控报告和股票列表
             loadBacktestReport();
             loadBacktestStockList();
@@ -1363,9 +1450,239 @@
             const imgUrl = `/api/backtest/get_chart/${chartPath}`;
             document.getElementById('chartImage').src = imgUrl;
             document.getElementById('chartModalLabel').textContent = chartPath.split('/')[0] + ' 回测图表';
-            
+
             const modal = new bootstrap.Modal(document.getElementById('chartModal'));
             modal.show();
+        }
+
+        // ==================== 板块分析相关函数 ====================
+
+        function showSectorAnalysis() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'block';
+            onSectorTypeChange();
+            loadSectorReports();
+            loadSectorList();
+        }
+
+        function onSectorTypeChange() {
+            const sectorType = document.querySelector('input[name="sector-type"]:checked').value;
+            // 行业板块：显示代码输入框 + 下拉选择器
+            const isIndustry = (sectorType === 'industry');
+            document.getElementById('sector-code-input-group').style.display =
+                isIndustry ? 'block' : 'none';
+            // 所有类型都显示下拉选择器
+            document.getElementById('sector-selector-group').style.display = 'block';
+            loadSectorList();
+        }
+
+        function loadSectorList() {
+            const sectorType = document.querySelector('input[name="sector-type"]:checked').value;
+            fetch(`/api/sector_list?type=${sectorType}`)
+                .then(r => r.json())
+                .then(data => {
+                    const sel = document.getElementById('sector-selector');
+                    sel.innerHTML = '<option value="">-- 选择板块 --</option>';
+                    if (data.success && data.sectors) {
+                        data.sectors.forEach(s => {
+                            const hasData = (s.has_data !== false) ? '' : ' ⚠️未采集';
+                            sel.innerHTML += `<option value="${s.code}">${s.name} (${s.code})${hasData}</option>`;
+                        });
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('sector-selector').innerHTML =
+                        '<option value="">-- 加载失败，请先更新板块数据 --</option>';
+                });
+        }
+
+        function onSectorSelectorChange() {
+            // 行业板块时，下拉选择同步到手动输入框
+            const sectorType = document.querySelector('input[name="sector-type"]:checked').value;
+            if (sectorType === 'industry') {
+                const sel = document.getElementById('sector-selector');
+                document.getElementById('sector-code-input').value = sel.value;
+            }
+        }
+
+        function startSectorAnalysis() {
+            const sectorType = document.querySelector('input[name="sector-type"]:checked').value;
+
+            // 获取板块代码：优先使用下拉框选择，行业板块也可手动输入
+            let sectorCode = document.getElementById('sector-selector').value;
+            if (!sectorCode && sectorType === 'industry') {
+                // 行业板块且下拉框未选择时，尝试从输入框读取
+                sectorCode = document.getElementById('sector-code-input').value.trim();
+            }
+
+            if (!sectorCode) {
+                alert('请先选择一个板块，或手动输入板块代码');
+                return;
+            }
+
+            document.getElementById('sector-task-status').style.display = 'block';
+            document.getElementById('sector-status-content').innerHTML =
+                '<div class="text-center"><div class="spinner-border" role="status"></div><p class="mt-2">正在请求 AI 分析，请耐心等待...</p></div>';
+            document.getElementById('sector-report').style.display = 'none';
+
+            fetch('/api/sector_analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    sector_code: sectorCode,
+                    sector_type: sectorType,
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        pollSectorTaskStatus(data.task_id);
+                    } else {
+                        document.getElementById('sector-status-content').innerHTML =
+                            `<div class="alert alert-danger">${data.message}</div>`;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('sector-status-content').innerHTML =
+                        `<div class="alert alert-danger">请求失败: ${err.message}</div>`;
+                });
+        }
+
+        function startSectorDataCollection() {
+            const sectorType = document.querySelector('input[name="sector-type"]:checked').value;
+            document.getElementById('sector-task-status').style.display = 'block';
+            document.getElementById('sector-status-content').innerHTML =
+                '<div class="text-center"><div class="spinner-border" role="status"></div><p class="mt-2">正在采集数据，这可能需要几分钟...</p></div>';
+
+            fetch('/api/sector_collect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ collect_type: sectorType })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        pollSectorTaskStatus(data.task_id);
+                    } else {
+                        document.getElementById('sector-status-content').innerHTML =
+                            `<div class="alert alert-danger">${data.message}</div>`;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('sector-status-content').innerHTML =
+                        `<div class="alert alert-danger">请求失败: ${err.message}</div>`;
+                });
+        }
+
+        function pollSectorTaskStatus(taskId) {
+            const statusContent = document.getElementById('sector-status-content');
+            fetch(`/api/sector_task_status/${taskId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'running' || data.status === 'pending') {
+                        let progress = data.progress || 0;
+                        let messages = (data.messages || []).slice(-20).map(m =>
+                            `<div class="small">${m}</div>`
+                        ).join('');
+                        statusContent.innerHTML = `
+                            <div class="progress mb-3">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width: ${progress}%">${progress}%</div>
+                            </div>
+                            <div class="border rounded p-2" style="max-height:400px;overflow-y:auto;background:#f8f9fa;font-family:monospace;font-size:0.85em;">
+                                ${messages || '<div class="text-muted">等待 AI 分析输出...</div>'}
+                            </div>`;
+                        setTimeout(() => pollSectorTaskStatus(taskId), 2000);
+                    } else if (data.status === 'completed') {
+                        statusContent.innerHTML = '<div class="alert alert-success">✅ AI 分析完成！</div>';
+                        // 加载报告
+                        fetch(`/api/sector_report/${taskId}`)
+                            .then(r => r.json())
+                            .then(rep => {
+                                if (rep.success) {
+                                    document.getElementById('sector-report-content').innerHTML =
+                                        marked.parse(rep.content);
+                                    document.getElementById('sector-report').style.display = 'block';
+                                    // 滚动到报告区域
+                                    document.getElementById('sector-report').scrollIntoView({ behavior: 'smooth' });
+                                }
+                            })
+                            .catch(() => {});
+                        loadSectorReports();
+                        loadSectorList();
+                    } else if (data.status === 'failed') {
+                        let messages = (data.messages || []).map(m => `<div>${m}</div>`).join('');
+                        statusContent.innerHTML =
+                            `<div class="alert alert-danger">❌ 任务失败：<br>${messages}</div>`;
+                    }
+                })
+                .catch(err => {
+                    statusContent.innerHTML =
+                        `<div class="alert alert-danger">状态查询失败: ${err.message}</div>`;
+                });
+        }
+
+        function loadSectorReports() {
+            fetch('/api/sector_reports')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.reports && data.reports.length > 0) {
+                        const catLabel = {'broad_index': '大盘指数', 'hk_index': '港股指数',
+                                          'industry': '行业板块', 'broad_market': '大盘全景'};
+                        let html = '<ul class="list-group">';
+                        data.reports.slice(0, 20).forEach(r => {
+                            const cat = catLabel[r.category] || r.category;
+                            const label = r.sector ? `${cat} › ${r.sector}` : cat;
+                            html += `<li class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                      style="cursor:pointer" onclick="loadSectorReportContent('${encodeURIComponent(r.name)}')">
+                                      <div><span class="badge bg-secondary me-2">${cat}</span>📄 ${r.filename}</div>
+                                      <small class="text-muted">${r.mtime}</small></li>`;
+                        });
+                        html += '</ul>';
+                        document.getElementById('sector-reports-container').innerHTML = html;
+                    } else {
+                        document.getElementById('sector-reports-container').innerHTML =
+                            '<small class="text-muted">暂无历史报告，请先执行分析</small>';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('sector-reports-container').innerHTML =
+                        '<small class="text-muted">加载失败</small>';
+                });
+        }
+
+        function loadSectorReportContent(reportName) {
+            // reportName 可能已被 encodeURIComponent 编码（从 onclick 传入），需要先解码
+            let decodedName = reportName;
+            try {
+                decodedName = decodeURIComponent(reportName);
+            } catch(e) {
+                // 如果解码失败，使用原始值
+            }
+            // 按路径分段编码：只编码每段中的特殊字符，保留 "/" 作为路径分隔符
+            const encodedPath = decodedName.split('/').map(seg => encodeURIComponent(seg)).join('/');
+            fetch(`/api/sector_report_content/${encodedPath}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('sector-report-content').innerHTML =
+                            marked.parse(data.content);
+                        document.getElementById('sector-report').style.display = 'block';
+                        // 滚动到报告区域
+                        document.getElementById('sector-report').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        alert('加载报告失败: ' + (data.message || '未知错误'));
+                    }
+                })
+                .catch(err => {
+                    alert('加载报告失败: ' + err.message);
+                });
         }
     </script>
 </body>

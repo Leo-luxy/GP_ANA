@@ -17,6 +17,7 @@ from api.detailed import detailed_bp
 from api.report_viewer import report_viewer_bp
 from api.quick_analysis import quick_analysis_bp
 from api.backtest import backtest_bp
+from api.sector import sector_bp
 
 # 注册蓝图
 app.register_blueprint(analysis_bp, url_prefix='/api')
@@ -25,6 +26,7 @@ app.register_blueprint(detailed_bp, url_prefix='/api')
 app.register_blueprint(report_viewer_bp, url_prefix='/api')
 app.register_blueprint(quick_analysis_bp, url_prefix='/api')
 app.register_blueprint(backtest_bp, url_prefix='/api/backtest')
+app.register_blueprint(sector_bp, url_prefix='/api')
 
 @app.route('/')
 def index():

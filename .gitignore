@@ -29,3 +29,6 @@ config.py
 # Temp
 *.tmp
 simplified_strategy_results.csv
+
+# Claude
+CLAUDE.md
