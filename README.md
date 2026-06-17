@@ -15,7 +15,7 @@
 
 **GP_ANA** 是一款面向 A 股市场的全流程量化投资与 AI 辅助决策系统。它打通了"数据采集 → 技术分析 → 策略回测 → AI 多维研判 → 交易决策"的完整链路，并通过 Flask Web 界面提供一站式的可视化操作体验。
 
-**核心流程：** 从东方财富、akshare、雪球等多源采集 20+ 类数据 → 覆盖财务、情绪估值、技术趋势、股东结构、研报观点五大维度的结构化分析 → 本地 LLM（Ollama）或云端大模型（OpenAI/DeepSeek/通义千问）进行两层 AI 决策 → 自动生成交易计划与 20+ 种专业分析图表。
+**核心流程：** 从东方财富、akshare、Tushare、新浪财经等多源采集 20+ 类数据 → 覆盖财务、情绪估值、技术趋势、股东结构、研报观点五大维度的结构化分析 → 本地 LLM（Ollama）或云端大模型（OpenAI/DeepSeek/通义千问）进行两层 AI 决策 → 自动生成交易计划与 20+ 种专业分析图表。
 
 **适用人群：** 希望用数据驱动决策的个人投资者、量化策略研究者、以及需要批量跟踪多只股票的活跃交易者。
 
@@ -25,7 +25,7 @@
 
 | 特性 | 传统炒股软件 | **GP_ANA** |
 |:---|:---|:---|
-| 数据来源 | 单一平台 | **20+ 采集器**，东方财富/akshare/雪球多源融合 |
+| 数据来源 | 单一平台 | **20+ 采集器**，东方财富/akshare/Tushare/新浪财经多源融合 |
 | 分析维度 | 仅 K 线 | **五大维度**：财务 + 情绪估值 + 技术趋势 + 股东结构 + 研报观点 |
 | AI 决策 | ❌ | ✅ **两层 AI 决策**：冲突检测 + 交易计划，支持 Ollama/OpenAI/DeepSeek |
 | 策略验证 | 手动复盘 | **自动回测**，趋势跟踪/均值回归/波段三种策略 |
@@ -73,18 +73,6 @@
   &nbsp;
   <img src="assets/screenshots/买卖记录管理.png" alt="买卖记录管理" width="45%">
 </p>
-
-| 特性 | 传统炒股软件 | **GP_ANA** |
-|:---|:---|:---|
-| 数据来源 | 单一平台 | **20+ 采集器**，东方财富/akshare/雪球多源融合 |
-| 分析维度 | 仅 K 线 | **五大维度**：财务 + 情绪估值 + 技术趋势 + 股东结构 + 研报观点 |
-| AI 决策 | ❌ | ✅ **两层 AI 决策**：冲突检测 + 交易计划，支持 Ollama/OpenAI/DeepSeek |
-| 策略验证 | 手动复盘 | **自动回测**，趋势跟踪/均值回归/波段三种策略 |
-| 可视化 | 固定模板 | **20+ 种专业图表**，价格/成交量/布林带/相关性/信号分析/趋势通道... |
-| 板块分析 | 手动翻看 | **四大板块类型**（大盘/行业/概念/港股）AI 深度分析，自动技术指标+LLM 报告 |
-| 市场选股 | 逐个翻找 | **全市场筛选**：Tushare 全市场日线 → 多条件筛选 → 趋势回测 → 最终持仓 |
-| 自选股管理 | 脑记笔记 | **Web 界面增删查**，回测/分析优先从关注列表取股票 |
-| 批量处理 | 逐个操作 | **一键批量**分析多只股票 |
 
 ---
 
@@ -217,7 +205,7 @@ AI_CONFIG = {
 ## 📦 依赖项
 
 ```
-pandas  numpy  matplotlib  seaborn  yfinance  akshare
+pandas  numpy  matplotlib  seaborn  akshare  tushare
 TA-Lib  scikit-learn  schedule  requests  flask
 ```
 
@@ -394,6 +382,7 @@ python batch_backtest_filter.py            # Step4: 批量趋势回测 → final
 - 技术指标计算需要 TA-Lib 库支持
 - 本地 AI 分析需要部署 [Ollama](https://ollama.com/) 服务
 - **板块分析首次使用**：板块列表初始为空，需先在 Web 界面点击"更新板块数据"或命令行运行 `python sector_data_collector.py --type broad_index` / `--type industry` 采集数据后，板块列表才会显示可分析的板块
+- **市场选股需要 Tushare token**：使用前需在 `stocks_filter/step1_daily.py` 和 `stocks_filter/step2_daily_basic.py` 中填入有效的 [Tushare](https://tushare.pro/) token
 - 所有数据采集程序采用增量保存，避免数据丢失
 - 数据文件存储在 `./data/{ticker}/` 目录下
 - `config.py` 和 `trading_records.py` 包含敏感信息，已加入 `.gitignore`
