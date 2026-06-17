@@ -288,6 +288,34 @@ def run_sector_task(task_id, task_type, params):
             return
         messages.append('[数据准备] 最新数据获取成功，开始分析...')
 
+        # ---- 单板块分析：也需刷新大盘指数数据，确保大盘对比时效性 ----
+        if task_type == 'analyze_single':
+            # 大盘对比使用 sh000001（上证指数），先刷新到最新
+            messages.append('[数据准备] 正在刷新大盘指数(sh000001)数据以确保对比时效性...')
+            sector_task_status[task_id] = {
+                'status': 'running', 'progress': 40,
+                'messages': messages.copy()
+            }
+
+            broad_collect_cmd = 'python sector_data_collector.py --type broad_index --code sh000001 --name "上证指数"'
+            broad_process = subprocess.Popen(
+                broad_collect_cmd, shell=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
+                cwd=project_root,
+            )
+            for line in iter(broad_process.stdout.readline, ''):
+                if line.strip():
+                    messages.append(line.strip())
+                    sector_task_status[task_id] = {
+                        'status': 'running', 'progress': 40,
+                        'messages': messages.copy()
+                    }
+            broad_process.wait()
+            if broad_process.returncode != 0:
+                # 非致命：大盘刷新失败不影响板块分析本身
+                messages.append('[数据准备] ⚠ 大盘指数数据刷新失败，对比部分将使用历史数据')
+
         # ---- 大盘全景分析：先采集所有大盘指数最新数据 ----
         if task_type == 'analyze_broad':
             messages.append('[数据准备] 正在获取所有大盘指数最新数据...')

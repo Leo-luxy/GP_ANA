@@ -377,17 +377,15 @@ class SectorAnalyzer:
             rs = avg_gain / avg_loss.replace(0, 1e-10)
             df['RSI'] = (100 - 100 / (1 + rs)).values
 
-        # ----- KDJ -----
-        if talib:
-            df['K'], df['D'] = talib.STOCH(high, low, close)
-            df['J'] = 3 * df['K'] - 2 * df['D']
-        else:
-            low_min = pd.Series(low).rolling(window=9).min()
-            high_max = pd.Series(high).rolling(window=9).max()
-            rsv = (close - low_min) / (high_max - low_min).replace(0, 1e-10) * 100
-            df['K'] = rsv.ewm(alpha=1/3, adjust=False).mean().values
-            df['D'] = df['K'].ewm(alpha=1/3, adjust=False).mean().values
-            df['J'] = 3 * df['K'] - 2 * df['D']
+        # ----- KDJ (标准9日, EMA平滑) -----
+        # 注意：不使用 talib.STOCH，因为其默认参数 (fastk_period=5, SMA平滑)
+        # 与标准 KDJ (9日RSV, EMA: K=2/3*前K+1/3*RSV) 不同
+        low_min = pd.Series(low).rolling(window=9).min()
+        high_max = pd.Series(high).rolling(window=9).max()
+        rsv = (close - low_min) / (high_max - low_min).replace(0, 1e-10) * 100
+        df['K'] = rsv.ewm(alpha=1/3, adjust=False).mean().values
+        df['D'] = df['K'].ewm(alpha=1/3, adjust=False).mean().values
+        df['J'] = 3 * df['K'] - 2 * df['D']
 
         # ----- BOLL (20日) -----
         ma20 = pd.Series(close).rolling(window=20).mean()
@@ -575,6 +573,18 @@ class SectorAnalyzer:
 
         if s_df is None or b_df is None:
             return {'error': '数据加载失败'}
+
+        # 检查数据时效性：板块和大指数数据的截止日期是否匹配
+        s_last_date = pd.to_datetime(s_df['date'].iloc[-1]) if 'date' in s_df.columns else None
+        b_last_date = pd.to_datetime(b_df['date'].iloc[-1]) if 'date' in b_df.columns else None
+        if s_last_date and b_last_date:
+            date_diff = abs((s_last_date - b_last_date).days)
+            if date_diff > 3:
+                print(f"  ⚠ 数据时效性警告: 板块最新数据 {s_last_date.strftime('%Y-%m-%d')} "
+                      f"vs 大盘最新数据 {b_last_date.strftime('%Y-%m-%d')} "
+                      f"(相差 {date_diff} 天)，对比结果可能不反映最新市况")
+                print(f"  建议先运行数据采集刷新大盘指数: "
+                      f"python sector_data_collector.py --type broad_index")
 
         # 按日期对齐
         s_df = s_df.set_index('date')

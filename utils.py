@@ -32,12 +32,15 @@ def calculate_technical_indicators(data_df):
         data_df['VOL20'] = talib.MA(data_df['volume'], timeperiod=20)
         data_df['Volume_Ratio'] = data_df['volume'] / data_df['volume'].rolling(window=5).mean()
         
-        # 计算KDJ指标
+        # 计算KDJ指标 (标准9日EMA算法)
+        # 注意：不使用 talib.STOCH，因其使用SMA平滑而非标准KDJ的EMA平滑
         high, low, close = data_df['high'], data_df['low'], data_df['close']
-        k, d = talib.STOCH(high, low, close, fastk_period=9, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
-        data_df['K'] = k
-        data_df['D'] = d
-        data_df['J'] = 3 * k - 2 * d
+        low_list = data_df['low'].rolling(window=9).min()
+        high_list = data_df['high'].rolling(window=9).max()
+        rsv = (data_df['close'] - low_list) / (high_list - low_list) * 100
+        data_df['K'] = rsv.ewm(com=2).mean()
+        data_df['D'] = data_df['K'].ewm(com=2).mean()
+        data_df['J'] = 3 * data_df['K'] - 2 * data_df['D']
         
         # 计算MACD指标
         macd, macd_signal, macd_hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
