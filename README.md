@@ -53,16 +53,16 @@
   <img src="assets/screenshots/单功能执行.png" alt="单功能执行" width="45%">
 </p>
 
-### 策略回测 & 板块分析
+### 策略回测 & 市场选股
 <p align="center">
   <img src="assets/screenshots/策略回测.png" alt="策略回测" width="45%">
   &nbsp;
-  <img src="assets/screenshots/板块分析.png" alt="板块分析" width="45%">
+  <img src="assets/screenshots/市场选股.png" alt="市场选股" width="45%">
 </p>
 
-### 市场选股 & 关注股票
+### 板块分析 & 关注股票
 <p align="center">
-  <img src="assets/screenshots/市场选股.png" alt="市场选股" width="45%">
+  <img src="assets/screenshots/板块分析.png" alt="板块分析" width="45%">
   &nbsp;
   <img src="assets/screenshots/关注股票.png" alt="关注股票" width="45%">
 </p>
