@@ -39,17 +39,40 @@
 
 ## 🖥️ 界面预览
 
-### Web 主界面
-![主界面](assets/screenshots/主界面.png)
+### 完整分析 & 快速分析
+<p align="center">
+  <img src="assets/screenshots/完整分析.png" alt="完整分析" width="45%">
+  &nbsp;
+  <img src="assets/screenshots/快速分析.png" alt="快速分析" width="45%">
+</p>
 
-### 分析报告列表
-![报告列表](assets/screenshots/报告列表.png)
+### 详细模式 & 单功能执行
+<p align="center">
+  <img src="assets/screenshots/详细模式.png" alt="详细模式" width="45%">
+  &nbsp;
+  <img src="assets/screenshots/单功能执行.png" alt="单功能执行" width="45%">
+</p>
 
-### 分析报告细则
-![报告细则](assets/screenshots/报告细则.png)
+### 策略回测 & 板块分析
+<p align="center">
+  <img src="assets/screenshots/策略回测.png" alt="策略回测" width="45%">
+  &nbsp;
+  <img src="assets/screenshots/板块分析.png" alt="板块分析" width="45%">
+</p>
 
-### 策略回测
-![策略回测](assets/screenshots/策略回测.png)
+### 市场选股 & 关注股票
+<p align="center">
+  <img src="assets/screenshots/市场选股.png" alt="市场选股" width="45%">
+  &nbsp;
+  <img src="assets/screenshots/关注股票.png" alt="关注股票" width="45%">
+</p>
+
+### 报告查看 & 买卖记录管理
+<p align="center">
+  <img src="assets/screenshots/报告查看.png" alt="报告查看" width="45%">
+  &nbsp;
+  <img src="assets/screenshots/买卖记录管理.png" alt="买卖记录管理" width="45%">
+</p>
 
 | 特性 | 传统炒股软件 | **GP_ANA** |
 |:---|:---|:---|
