@@ -31,6 +31,8 @@
 | 策略验证 | 手动复盘 | **自动回测**，趋势跟踪/均值回归/波段三种策略 |
 | 可视化 | 固定模板 | **20+ 种专业图表**，价格/成交量/布林带/相关性/信号分析/趋势通道... |
 | 板块分析 | 手动翻看 | **四大板块类型**（大盘/行业/概念/港股）AI 深度分析，自动技术指标+LLM 报告 |
+| 市场选股 | 逐个翻找 | **全市场筛选**：Tushare 全市场日线 → 多条件筛选 → 趋势回测 → 最终持仓 |
+| 自选股管理 | 脑记笔记 | **Web 界面增删查**，回测/分析优先从关注列表取股票 |
 | 批量处理 | 逐个操作 | **一键批量**分析多只股票 |
 
 ---
@@ -57,6 +59,8 @@
 | 策略验证 | 手动复盘 | **自动回测**，趋势跟踪/均值回归/波段三种策略 |
 | 可视化 | 固定模板 | **20+ 种专业图表**，价格/成交量/布林带/相关性/信号分析/趋势通道... |
 | 板块分析 | 手动翻看 | **四大板块类型**（大盘/行业/概念/港股）AI 深度分析，自动技术指标+LLM 报告 |
+| 市场选股 | 逐个翻找 | **全市场筛选**：Tushare 全市场日线 → 多条件筛选 → 趋势回测 → 最终持仓 |
+| 自选股管理 | 脑记笔记 | **Web 界面增删查**，回测/分析优先从关注列表取股票 |
 | 批量处理 | 逐个操作 | **一键批量**分析多只股票 |
 
 ---
@@ -108,6 +112,7 @@ GP_ANA 为每只股票自动生成 **20+ 种专业级分析图表**，无需任�
 │                     📡 数据采集层                              │
 │   20+ 采集器：行情 / 财务 / 资金流 / 融资融券 / 股东 / 行业 / 研报   │
 │   + 板块数据：大盘指数 / 行业板块 / 概念板块 / 港股指数             │
+│   + 全市场数据：Tushare 日线行情 / 基础指标                        │
 └──────────────────────────┬───────────────────────────────────┘
                            ▼
 ┌──────────────────────────────────────────────────────────────┐
@@ -125,8 +130,8 @@ GP_ANA 为每只股票自动生成 **20+ 种专业级分析图表**，无需任�
 └──────────────────────────┬───────────────────────────────────┘
                            ▼
 ┌──────────────────────────────────────────────────────────────┐
-│              📊 可视化 & 📈 策略回测 & 🌐 Web 界面               │
-│   20+ 图表 / 3 种策略模式 / Flask Web UI (localhost:8081)       │
+│              📊 可视化 & 📈 策略回测 & 🎯 市场选股 & 🌐 Web 界面    │
+│   20+ 图表 / 3 种策略模式 / 全市场筛选+回测 / Flask Web UI          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -163,6 +168,8 @@ python web_ui.py
 | ⚡ **快速分析** | 点击"快速分析"，选择策略视角 | 30 秒 | 每日盘后快速复盘 |
 | 📊 **策略回测** | 点击"回测"，选择策略参数 | 1-2 分钟 | 验证交易策略有效性 |
 | 🏢 **板块分析** | 点击"板块分析"，选择板块类型和代码 | 2-3 分钟 | 大盘/行业/概念/港股 AI 深度分析<br>⚠️ **首次使用需先点击"更新板块数据"** |
+| 🎯 **市场选股** | 点击"市场选股"，勾选筛选模式 | 3-5 分钟 | 全市场日线 → 多条件筛选 → 趋势回测 → 最终持仓列表 |
+| ⭐ **自选股管理** | 点击"关注股票"，添加/查看/删除 | 即时 | 管理关注列表，回测和分析优先使用关注股票 |
 
 ---
 
@@ -215,6 +222,10 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | `shenwan_industry_collector.py` | 申万行业分类 | 东方财富 API | `{ticker}_industry_info.json` |
 | `batch_margin_collector.py` ⭐ | 批量融资融券数据采集 | akshare | 多股票 `_margin_data.csv` |
 | `sector_data_collector.py` ⭐ | **板块数据采集** — 大盘指数/行业/概念/港股，新浪财经+东方财富 | akshare / 新浪 | `data/sector/{type}/{code}/` |
+| `stocks_filter/step1_daily.py` ⭐ | **全市场日线行情** — Tushare pro.daily() 获取全 A 股日线 | Tushare | `stocks_daily_temp.csv` |
+| `stocks_filter/step2_daily_basic.py` ⭐ | **全市场基础指标** — 换手率/市值/PE/PB 等合并 | Tushare | `stocks_daily_full.csv` |
+| `stocks_filter/step3_filter.py` ⭐ | **多条件筛选** — 价格/成交额/换手率/市值/振幅/涨幅过滤 | 本地计算 | `stocks_daily_filtered.csv` |
+| `stocks_filter/batch_backtest_filter.py` ⭐ | **批量回测筛选** — 对筛选结果逐只趋势回测，输出最终持仓 | 本地计算 | `final_holdings.csv` |
 
 ### 2. 数据分析类
 
@@ -273,7 +284,9 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | 程序名称 | 功能 |
 |---------|------|
 | `trend_following_backtest.py` | 趋势跟踪策略回测引擎 |
-| `backtest_all_stocks.py` | 全股票批量回测 |
+| `backtest_all_stocks.py` | 全股票批量回测（`--mode full\|simple`） |
+| `trend_following_backtest_simplified.py` ⭐ | 简化版趋势跟踪回测（仅 MA5>MA20） |
+| `backtest_all_stocks_simplified.py` ⭐ | 简化版全股票批量回测 |
 
 ### 6. Web 界面 & API
 
@@ -288,12 +301,15 @@ TA-Lib  scikit-learn  schedule  requests  flask
 | `api/report_viewer.py` | 报告查看 API |
 | `api/common.py` ⭐ | 共享模块（交易所映射、任务队列、步骤执行引擎） |
 | `api/sector.py` ⭐ | **板块分析 API** — 数据采集/分析触发/状态轮询/报告获取 |
+| `api/stock_selection.py` ⭐ | **市场选股 API** — 异步选股任务/进度追踪/结果读取 |
+| `api/watchlist.py` ⭐ | **自选股管理 API** — 关注列表增删查 |
 
 ### 7. 工具 & 配置
 
 | 文件名 | 功能 |
 |-------|------|
 | `config.py` | 系统配置（股票代码、AI模型、技术指标参数、策略参数） |
+| `watchlist.py` ⭐ | 自选股配置（Web 界面可增删，回测/分析优先使用） |
 | `requirements.txt` | Python 依赖包列表 |
 | `utils.py` | 通用工具函数（日期处理、文件操作、日志等） |
 | `check_data_updates.py` | 统一数据更新检查（`--mode daily\|periodic`） |
@@ -324,6 +340,13 @@ python sector_data_collector.py --type broad_index                # 采集大盘
 python sector_data_collector.py --type industry --top 30           # 采集行业板块数据
 python analyze_sector.py --mode single --sector BK0477             # 单板块深度分析
 python analyze_sector.py --mode broad                              # 大盘全景分析
+
+# 市场选股（三步流水线）
+cd stocks_filter
+python step1_daily.py                     # Step1: 获取全市场日线行情
+python step2_daily_basic.py               # Step2: 获取基础指标并合并（需等 step1 完成 1 小时后）
+python step3_filter.py                    # Step3: 多条件筛选
+python batch_backtest_filter.py            # Step4: 批量趋势回测 → final_holdings.csv
 ```
 
 ---
@@ -332,6 +355,7 @@ python analyze_sector.py --mode broad                              # 大盘全�
 
 | 版本 | 日期 | 主要变更 |
 |------|------|---------|
+| **v1.4.0** | 2026-06 | 市场选股+自选股管理、KDJ/板块时效性修复、回测增强（关注列表+公司名）、超时控制 |
 | **v1.3.0** | 2026-06 | 板块分析：四大类型 AI 分析、新浪财经数据源、sector API |
 | **v1.2.0** | 2026-05 | 架构重构：统一入口、Process/引擎、两层决策、快速分析、回测系统 |
 | v1.1.0 | 2026-03 | 41 模块：Web 界面、12 个新采集器、5 个新分析引擎 |
