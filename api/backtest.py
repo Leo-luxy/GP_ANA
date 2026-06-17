@@ -10,6 +10,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
 import threading
 import queue
+import re
 
 # 创建蓝图
 backtest_bp = Blueprint('backtest', __name__)
@@ -22,6 +23,19 @@ try:
     from config import DATA_DIR
 except ImportError:
     DATA_DIR = "./data"
+
+def get_company_name(ticker):
+    """获取股票的公司简称"""
+    company_file = os.path.join(DATA_DIR, ticker, f"{ticker}_company_basic.json")
+    if os.path.exists(company_file):
+        try:
+            with open(company_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if 'basic_info' in data and '公司简称' in data['basic_info']:
+                    return data['basic_info']['公司简称']
+        except Exception:
+            pass
+    return ticker
 
 def run_backtest_task(task_id, skip_data_update=False, use_simplified=False):
     """运行回测任务
@@ -41,15 +55,22 @@ def run_backtest_task(task_id, skip_data_update=False, use_simplified=False):
         messages = []
         total_stocks = 0
         
-        # 获取股票列表 - 自动检测data目录中的所有股票
+        # 获取股票列表 - 优先从关注列表读取
         ticker_list = []
-        if os.path.exists(DATA_DIR):
-            for item in os.listdir(DATA_DIR):
-                item_path = os.path.join(DATA_DIR, item)
-                if os.path.isdir(item_path):
-                    qfq_file = os.path.join(item_path, f"{item}_qfq.csv")
-                    if os.path.exists(qfq_file):
-                        ticker_list.append(item)
+        try:
+            from watchlist import WATCHLIST
+            ticker_list = [item[0] for item in WATCHLIST]
+            messages.append(f'从关注列表读取到 {len(ticker_list)} 只股票')
+        except ImportError:
+            messages.append('未找到 watchlist.py，从 data 目录获取股票')
+            # 降级方案：从data目录获取
+            if os.path.exists(DATA_DIR):
+                for item in os.listdir(DATA_DIR):
+                    item_path = os.path.join(DATA_DIR, item)
+                    if os.path.isdir(item_path):
+                        qfq_file = os.path.join(item_path, f"{item}_qfq.csv")
+                        if os.path.exists(qfq_file):
+                            ticker_list.append(item)
         ticker_list.sort()
         total_stocks = len(ticker_list)
         
@@ -250,7 +271,7 @@ def get_stock_list():
                 png_files = []
                 for f in os.listdir(item_path):
                     # 只选择标准回测图，排除简化版和其他类型
-                    if f.endswith('.png') and 'backtest' in f and 'simplified' not in f:
+                    if f.endswith('.png') and 'backtest' in f and 'simplified' not in f and 'recent' not in f:
                         png_files.append(f)
                 
                 if png_files:
@@ -293,12 +314,49 @@ def get_report():
     
     with open(report_path, 'r', encoding='utf-8') as f:
         content = f.read()
-    
+
+    content = add_company_names_to_report(content)
+
     return jsonify({
         'success': True,
         'content': content,
         'filename': os.path.basename(report_path)
     })
+
+def add_company_names_to_report(content):
+    """在监控报告表格中添加公司简称"""
+    lines = content.split('\n')
+    new_lines = []
+    in_table = False
+    has_company_column = False
+
+    for line in lines:
+        if '| 股票代码 |' in line:
+            if '| 公司简称 |' in line:
+                has_company_column = True
+            else:
+                line = line.replace('| 股票代码 |', '| 股票代码 | 公司简称 |', 1)
+            in_table = True
+            new_lines.append(line)
+        elif in_table and line.startswith('| :---') and not has_company_column:
+            line = line.replace('| :--- |', '| :--- | :--- |', 1)
+            new_lines.append(line)
+        elif in_table and line.startswith('| ') and '|' in line and not has_company_column:
+            parts = line.split('|')
+            if len(parts) >= 3:
+                ticker = parts[1].strip()
+                if re.match(r'^\d{6}\.[SHSZ]{2}$', ticker):
+                    company_name = get_company_name(ticker)
+                    new_line = '|'.join([parts[0], parts[1], f' {company_name} '] + parts[2:])
+                    new_lines.append(new_line)
+                    continue
+            new_lines.append(line)
+        else:
+            if in_table and not line.startswith('|'):
+                in_table = False
+            new_lines.append(line)
+
+    return '\n'.join(new_lines)
 
 @backtest_bp.route('/get_chart/<path:chart_path>')
 def get_chart(chart_path):

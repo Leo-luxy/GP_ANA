@@ -18,6 +18,8 @@ from api.report_viewer import report_viewer_bp
 from api.quick_analysis import quick_analysis_bp
 from api.backtest import backtest_bp
 from api.sector import sector_bp
+from api.stock_selection import stock_selection_bp
+from api.watchlist import watchlist_bp
 
 # 注册蓝图
 app.register_blueprint(analysis_bp, url_prefix='/api')
@@ -27,6 +29,8 @@ app.register_blueprint(report_viewer_bp, url_prefix='/api')
 app.register_blueprint(quick_analysis_bp, url_prefix='/api')
 app.register_blueprint(backtest_bp, url_prefix='/api/backtest')
 app.register_blueprint(sector_bp, url_prefix='/api')
+app.register_blueprint(stock_selection_bp, url_prefix='/api')
+app.register_blueprint(watchlist_bp, url_prefix='/api')
 
 @app.route('/')
 def index():

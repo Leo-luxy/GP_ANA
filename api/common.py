@@ -33,10 +33,17 @@ def get_exchange_suffix(stock_code: str) -> str:
 task_queue = queue.Queue()
 task_status = {}
 
-def execute_step(step_name: str, command: str, cwd: str, messages: list) -> tuple:
+def execute_step(step_name: str, command: str, cwd: str, messages: list, timeout_seconds: int = 300) -> tuple:
     """
     执行单个 shell 步骤，实时捕获输出。
     返回 (success: bool, detail: str)
+
+    Args:
+        step_name: 步骤名称
+        command: 要执行的命令
+        cwd: 工作目录
+        messages: 消息列表（用于记录输出）
+        timeout_seconds: 超时时间（秒），默认5分钟
     """
     if not command:
         messages.append(f'  跳过: {step_name}')
@@ -52,10 +59,29 @@ def execute_step(step_name: str, command: str, cwd: str, messages: list) -> tupl
             bufsize=1,
             cwd=cwd
         )
-        for line in iter(process.stdout.readline, ''):
-            if line.strip():
-                messages.append(f'  {line.strip()}')
-        process.wait()
+
+        start_time = time.time()
+
+        while True:
+            # 检查是否超时
+            if time.time() - start_time > timeout_seconds:
+                process.kill()
+                messages.append(f'  ⚠️ 步骤超时({timeout_seconds}秒)，已终止进程')
+                return False, 'timeout'
+
+            # 读取输出
+            line = process.stdout.readline()
+            if line:
+                if line.strip():
+                    messages.append(f'  {line.strip()}')
+            else:
+                # 检查进程是否结束
+                if process.poll() is not None:
+                    break
+
+            # 短暂等待
+            time.sleep(0.1)
+
         if process.returncode == 0:
             return True, 'success'
         else:
@@ -81,7 +107,23 @@ def _execute_steps(task_id, full_stock_code, steps, label):
             'progress': int((i / total_steps) * 100),
             'messages': messages.copy()
         }
-        success, result = execute_step(step_name, command, project_root, messages)
+        # 根据步骤类型设置不同的超时时间
+        timeout_seconds = 300  # 默认5分钟
+
+        if step_name.startswith('[采集]'):
+            timeout_seconds = 300  # 数据采集：5分钟
+        elif step_name.startswith('[计算]'):
+            timeout_seconds = 180  # 本地计算：3分钟
+        elif step_name.startswith('[分析]'):
+            timeout_seconds = 600  # 普通分析：10分钟
+        elif step_name.startswith('[摘要]'):
+            timeout_seconds = 900  # LLM摘要：15分钟
+        elif step_name.startswith('[决策]'):
+            timeout_seconds = 1200  # LLM决策：20分钟
+        elif step_name.startswith('[综合]'):
+            timeout_seconds = 1800  # AI综合分析：30分钟
+
+        success, result = execute_step(step_name, command, project_root, messages, timeout_seconds)
         if success:
             messages.append(f'  ✅ {step_name} 完成')
         else:

@@ -1,13 +1,10 @@
-# backtest_all_stocks.py
-# 批量回测所有股票
-# --mode full:  严格多头排列 (MA5>MA10>MA20>MA60)
-# --mode simple: 宽松多头排列 (MA5>MA20)
+# backtest_all_stocks_simplified.py
 import os
 import json
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from trend_following_backtest import TrendFollowingStrategy
+from trend_following_backtest_simplified import TrendFollowingStrategy
 
 try:
     from config import DATA_DIR
@@ -47,28 +44,40 @@ def get_company_name(ticker):
             pass
     return ticker
 
-def run_batch_backtest(mode='full'):
-    """批量回测所有股票"""
+def run_batch_backtest():
+    """批量回测所有股票（简化版策略：MA5 > MA20）"""
     stocks = get_all_stocks()
-    mode_label = '严格多头排列' if mode == 'full' else '宽松多头排列'
     print(f"找到 {len(stocks)} 只股票")
-    print(f"\n📌 策略模式: {mode_label} ({mode})")
-
+    print("\n📌 使用简化版策略参数(优化后):")
+    print("   - ADX入场阈值: 20 (原25)")
+    print("   - 成交量阈值: 1.05 (原1.1)")
+    print("   - ATR止损倍数: 3.0")
+    print("   - 吊灯止损倍数: 3.0")
+    print("   - 趋势确认天数: 1")
+    print("   - 平价保护: 盈利>1倍ATR启动")
+    
+    optimized_params = {
+        'adx_threshold': 20,
+        'atr_stop_multiplier': 3.0,
+        'chandelier_atr_multiplier': 3.0,
+        'volume_ratio_threshold': 1.05,
+        'confirmation_days': 1,
+        'profit_target_atr': 2.0
+    }
+    
     results = []
     timestamp = datetime.now().strftime('%Y%m%d')
-
+    
     for ticker in stocks:
         print(f"\n=== 分析 {ticker} ===")
-
+        
         try:
-            strategy = TrendFollowingStrategy(ticker, mode=mode)
+            strategy = TrendFollowingStrategy(ticker, params=optimized_params)
             if strategy.load_data():
                 trades = strategy.run_backtest(initial_capital=1000000, position_ratio=0.8)
                 
-                # 保存交易信号到CSV
                 strategy.save_trades_to_csv()
                 
-                # 生成回测图表
                 stock_dir = os.path.join(DATA_DIR, ticker)
                 os.makedirs(stock_dir, exist_ok=True)
                 plot_path = os.path.join(stock_dir, f"{ticker}_backtest_{timestamp}.png")
@@ -115,29 +124,25 @@ def analyze_results(results):
     df = pd.DataFrame(results)
     
     print("\n" + "="*80)
-    print("📊 批量回测结果统计")
+    print("📊 批量回测结果统计（简化版策略）")
     print("="*80)
     
-    # 整体统计
     print(f"\n总股票数: {len(df)}")
     print(f"盈利股票数: {len(df[df['total_return'] > 0])} ({len(df[df['total_return'] > 0])/len(df)*100:.1f}%)")
     print(f"平均收益率: {df['total_return'].mean():.2f}%")
     print(f"平均胜率: {df['win_rate'].mean():.2f}%")
     print(f"平均交易次数: {df['total_trades'].mean():.1f}")
     
-    # 表现最好的股票
     top_stocks = df.sort_values('total_return', ascending=False).head(5)
     print("\n🏆 表现最佳的5只股票:")
     for _, row in top_stocks.iterrows():
         print(f"  {row['ticker']}: 收益率 {row['total_return']:.2f}%, 胜率 {row['win_rate']:.1f}%, 交易 {int(row['total_trades'])}次")
     
-    # 表现最差的股票
     worst_stocks = df.sort_values('total_return').head(5)
     print("\n💀 表现最差的5只股票:")
     for _, row in worst_stocks.iterrows():
         print(f"  {row['ticker']}: 收益率 {row['total_return']:.2f}%, 胜率 {row['win_rate']:.1f}%, 交易 {int(row['total_trades'])}次")
     
-    # 离场类型分析
     print("\n📈 离场类型分布:")
     total_stop_loss = df['stop_loss_count'].sum()
     total_trailing = df['trailing_stop_count'].sum()
@@ -149,7 +154,6 @@ def analyze_results(results):
         print(f"  移动止盈: {total_trailing}次 ({total_trailing/total*100:.1f}%)")
         print(f"  趋势结束: {total_trend_end}次 ({total_trend_end/total*100:.1f}%)")
     
-    # 策略有效性分析
     profitable = df[df['total_return'] > 0]
     avg_profit_win = profitable['avg_profit'].mean()
     avg_loss_lose = df[df['total_return'] <= 0]['avg_profit'].mean()
@@ -158,7 +162,6 @@ def analyze_results(results):
     print(f"  盈利股票平均收益: {avg_profit_win:.2f}%")
     print(f"  亏损股票平均亏损: {avg_loss_lose:.2f}%")
     
-    # 保存结果到CSV
     timestamp = pd.Timestamp.now().strftime('%Y%m%d')
     result_path = os.path.join(DATA_DIR, f"backtest_results_{timestamp}.csv")
     df.to_csv(result_path, index=False, encoding='utf-8-sig')
@@ -169,10 +172,9 @@ def analyze_results(results):
 def generate_suggestions(df):
     """生成优化建议"""
     print("\n" + "="*80)
-    print("💡 策略优化建议")
+    print("💡 策略优化建议（简化版）")
     print("="*80)
     
-    # 基于结果分析给出建议
     avg_win_rate = df['win_rate'].mean()
     avg_return = df['total_return'].mean()
     
@@ -190,7 +192,6 @@ def generate_suggestions(df):
         suggestions.append("   - 调整移动止盈参数，让利润奔跑")
         suggestions.append("   - 考虑多时间周期确认")
     
-    # 检查是否有股票表现特别好
     top_performer = df.sort_values('total_return', ascending=False).iloc[0]
     if top_performer['total_return'] > 100:
         suggestions.append(f"\n⭐ 优秀案例: {top_performer['ticker']}")
@@ -198,7 +199,6 @@ def generate_suggestions(df):
         suggestions.append(f"   - 胜率: {top_performer['win_rate']:.1f}%")
         suggestions.append("   - 分析该股票特征，推广到其他股票")
     
-    # 检查是否有股票表现特别差
     worst_performer = df.sort_values('total_return').iloc[0]
     if worst_performer['total_return'] < -30:
         suggestions.append(f"\n💀 问题案例: {worst_performer['ticker']}")
@@ -210,9 +210,9 @@ def generate_suggestions(df):
         print(suggestion)
 
 def generate_monitor_report(stocks):
-    """生成监控报告，方便实时监控"""
+    """生成监控报告"""
     print("\n" + "="*80)
-    print("📡 实时监控报告")
+    print("📡 实时监控报告（简化版）")
     print("="*80)
     
     holding_stocks = []
@@ -222,12 +222,10 @@ def generate_monitor_report(stocks):
     for ticker in stocks:
         stock_dir = os.path.join(DATA_DIR, ticker)
         
-        # 优先查找今天的回测文件
         today_csv = f"{ticker}_backtest_{timestamp}.csv"
         csv_path = os.path.join(stock_dir, today_csv)
         
         if not os.path.exists(csv_path):
-            # 如果今天的文件不存在，查找最新的回测文件（排除simplified版本）
             csv_files = []
             for f in os.listdir(stock_dir):
                 if f.startswith(f"{ticker}_backtest_") and f.endswith(".csv") and "simplified" not in f:
@@ -252,7 +250,6 @@ def generate_monitor_report(stocks):
                 
                 if signal_type == 'sell':
                     if exit_type == 'final_close':
-                        # final_close 表示持有到最后，仍在持仓中
                         buy_signals = df[df['signal_type'] == 'buy']
                         if len(buy_signals) > 0:
                             last_buy = buy_signals.iloc[-1]
@@ -268,7 +265,6 @@ def generate_monitor_report(stocks):
                                 'trend_ended': last_row['trend_ended']
                             })
                         else:
-                            # 没有对应的buy信号，按等待入场处理
                             pending_stocks.append({
                                 'ticker': ticker,
                                 'company_name': get_company_name(ticker),
@@ -277,7 +273,6 @@ def generate_monitor_report(stocks):
                                 'last_profit': last_row['trade_profit']
                             })
                     else:
-                        # 非final_close的sell表示已离场，等待入场
                         pending_stocks.append({
                             'ticker': ticker,
                             'company_name': get_company_name(ticker),
@@ -286,7 +281,6 @@ def generate_monitor_report(stocks):
                             'last_profit': last_row['trade_profit']
                         })
                 elif signal_type == 'buy':
-                    # 最后信号是buy，表示当前持有
                     holding_stocks.append({
                         'ticker': ticker,
                         'company_name': get_company_name(ticker),
@@ -299,7 +293,6 @@ def generate_monitor_report(stocks):
                         'trend_ended': last_row['trend_ended']
                     })
                 else:
-                    # 没有明确的买卖信号，按等待入场处理
                     pending_stocks.append({
                         'ticker': ticker,
                         'company_name': get_company_name(ticker),
@@ -310,7 +303,6 @@ def generate_monitor_report(stocks):
         except Exception as e:
             print(f"❌ {ticker}: 读取回测文件失败 - {str(e)}")
     
-    # 排序：持仓股票按买入日期降序，等待入场按上次离场日期降序
     holding_stocks.sort(key=lambda x: x['entry_date'], reverse=True)
     pending_stocks.sort(key=lambda x: x['last_exit_date'], reverse=True)
     
@@ -331,12 +323,11 @@ def generate_monitor_report(stocks):
     for stock in pending_stocks:
         print(f"{stock['ticker']:<12} {stock['company_name']:<12} {stock['last_exit_date']:<12} {stock['last_exit_type']:<12} {stock['last_profit']:<12.2f}")
     
-    # 生成监控文件（MD格式）
     timestamp = datetime.now().strftime('%Y%m%d')
     monitor_file = os.path.join(DATA_DIR, f"monitor_report_{timestamp}.md")
     
     with open(monitor_file, 'w', encoding='utf-8') as f:
-        f.write(f"# 📡 实时监控报告\n\n")
+        f.write(f"# 📡 实时监控报告（简化版）\n\n")
         f.write(f"> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
         f.write(f"## 📊 当前持仓股票 ({len(holding_stocks)}只)\n\n")
@@ -355,7 +346,6 @@ def generate_monitor_report(stocks):
     print(f"\n📁 监控报告已保存到: {monitor_file}")
 
 def Glob(pattern, path):
-    """简单的glob实现"""
     import fnmatch
     matches = []
     if os.path.exists(path):
@@ -365,13 +355,9 @@ def Glob(pattern, path):
     return matches
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="批量回测所有股票")
-    parser.add_argument('--mode', choices=['full', 'simple'], default='full', help='策略模式')
-    args = parser.parse_args()
-
-    results = run_batch_backtest(mode=args.mode)
+    results = run_batch_backtest()
     df = analyze_results(results)
     generate_suggestions(df)
+    
     stocks = get_all_stocks()
     generate_monitor_report(stocks)

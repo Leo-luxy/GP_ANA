@@ -22,13 +22,12 @@ test/
 # Logs
 log/
 
-# Sensitive (trading records contain portfolio info, config contains personal settings)
+# Sensitive (trading records contain portfolio info)
 trading_records.py
-config.py
+
+# Claude
+CLAUDE.md
 
 # Temp
 *.tmp
 simplified_strategy_results.csv
-
-# Claude
-CLAUDE.md

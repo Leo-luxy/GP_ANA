@@ -25,6 +25,26 @@
         .spinner-border {
             margin-top: 20px;
         }
+        .btn-purple {
+            color: #fff;
+            background-color: #6f42c1;
+            border-color: #6f42c1;
+        }
+        .btn-purple:hover {
+            color: #fff;
+            background-color: #5a32a3;
+            border-color: #542e92;
+        }
+        .btn-teal {
+            color: #fff;
+            background-color: #117a8b;
+            border-color: #117a8b;
+        }
+        .btn-teal:hover {
+            color: #fff;
+            background-color: #0e6674;
+            border-color: #0d5c69;
+        }
         .markdown-body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 16px;
@@ -114,6 +134,8 @@
             <button class="btn btn-danger me-2" onclick="showReportViewer()">报告查看</button>
             <button class="btn btn-dark me-2" onclick="showBacktestPage()">策略回测</button>
             <button class="btn btn-outline-primary" onclick="showSectorAnalysis()">板块分析</button>
+			<button class="btn btn-purple" onclick="showStockSelection()">市场选股</button>
+            <button class="btn btn-teal" onclick="showWatchlist()">关注股票</button>
         </div>
         
         <!-- 完整分析页面 -->
@@ -517,6 +539,81 @@
     </div>
     </div>
 
+    <!-- 市场选股页面 -->
+    <div class="card mt-4" id="stock-selection-page" style="display: none;">
+        <div class="card-body">
+            <h5 class="card-title">市场选股</h5>
+            
+            <!-- 选股模式选择 -->
+            <div class="form-group mt-3">
+                <label class="form-label">选股模式</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="selection-preliminary" value="preliminary" checked>
+                    <label class="form-check-label" for="selection-preliminary">初步筛选（获取全市场数据并筛选）</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="selection-detailed" value="detailed">
+                    <label class="form-check-label" for="selection-detailed">详细回测（批量回测筛选后的股票）</label>
+                </div>
+            </div>
+            
+            <!-- 运行选股按钮 -->
+            <button class="btn btn-purple mt-3" onclick="runStockSelection()">开始选股</button>
+            
+            <!-- 任务状态 -->
+            <div id="selection-task-status" class="mt-4" style="display: none;">
+                <h5>选股任务状态</h5>
+                <div id="selection-status-content"></div>
+            </div>
+            
+            <!-- 选股结果 -->
+            <div id="selection-result" class="mt-4" style="display: none;">
+                <h5>选股结果</h5>
+                <div id="selection-result-content"></div>
+            </div>
+            
+            <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
+        </div>
+    </div>
+
+    <!-- 关注股票页面 -->
+    <div class="card mt-4" id="watchlist-page" style="display: none;">
+        <div class="card-body">
+            <h5 class="card-title">关注股票</h5>
+            
+            <!-- 股票列表 -->
+            <div class="mt-4">
+                <h6>关注列表</h6>
+                <div id="watchlist-container"></div>
+            </div>
+            
+            <!-- 添加股票 -->
+            <div class="mt-4">
+                <h6>添加股票</h6>
+                <form onsubmit="event.preventDefault(); addToWatchlist();">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="watchlist-stock-code" class="form-label">股票代码</label>
+                            <input type="text" id="watchlist-stock-code" class="form-control" placeholder="例如：300433">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="watchlist-stock-name" class="form-label">股票名称</label>
+                            <input type="text" id="watchlist-stock-name" class="form-control" placeholder="例如：蓝思科技">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-teal form-control">添加</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <button class="btn btn-secondary mt-4" onclick="showMainPage()">返回首页</button>
+        </div>
+    </div>
+    </div>
+
+
     <!-- 版本信息 -->
     <div class="container mt-4 mb-4">
         <div class="text-center text-muted">
@@ -534,6 +631,8 @@
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('main-page').style.display = 'block';
         }
         
@@ -545,6 +644,8 @@
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('quick-analysis').style.display = 'block';
         }
         
@@ -556,6 +657,8 @@
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('trading-records').style.display = 'block';
             loadTradingRecords();
         }
@@ -568,6 +671,8 @@
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('detailed-mode').style.display = 'block';
         }
         
@@ -580,6 +685,8 @@
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'block';
             loadStocks();
         }
@@ -592,6 +699,8 @@
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('single-function').style.display = 'block';
             updateProgramList();
         }
@@ -1293,6 +1402,8 @@
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'block';
 
             // 加载已有的监控报告和股票列表
@@ -1465,6 +1576,8 @@
             document.getElementById('single-function').style.display = 'none';
             document.getElementById('report-viewer').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('sector-analysis-page').style.display = 'block';
             onSectorTypeChange();
             loadSectorReports();
@@ -1683,6 +1796,268 @@
                 .catch(err => {
                     alert('加载报告失败: ' + err.message);
                 });
+        }
+
+        // 市场选股相关函数
+        function showStockSelection() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'block';
+            loadSelectionResult();
+        }
+
+        function runStockSelection() {
+            const preliminary = document.getElementById('selection-preliminary').checked;
+            const detailed = document.getElementById('selection-detailed').checked;
+            
+            if (!preliminary && !detailed) {
+                alert('请至少选择一种选股模式');
+                return;
+            }
+            
+            document.getElementById('selection-task-status').style.display = 'block';
+            document.getElementById('selection-status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
+            
+            fetch('/api/stock_selection/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ preliminary: preliminary, detailed: detailed })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    pollSelectionTaskStatus(data.task_id);
+                } else {
+                    document.getElementById('selection-status-content').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('selection-status-content').innerHTML = `<div class="alert alert-danger">请求失败：${error.message}</div>`;
+            });
+        }
+
+        function pollSelectionTaskStatus(taskId) {
+            const statusContent = document.getElementById('selection-status-content');
+            
+            fetch(`/api/stock_selection/task_status/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'running') {
+                    let progress = data.progress || 0;
+                    let messages = data.messages || [];
+                    let messageHtml = messages.slice(-20).map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-purple" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">${progress}%</div>
+                        </div>
+                        <div class="border p-3" style="max-height: 400px; overflow-y: auto;" id="selection-message-container">
+                            ${messageHtml}
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        const messageContainer = document.getElementById('selection-message-container');
+                        if (messageContainer) {
+                            messageContainer.scrollTop = messageContainer.scrollHeight;
+                        }
+                    }, 100);
+                    setTimeout(() => pollSelectionTaskStatus(taskId), 2000);
+                } else if (data.status === 'completed') {
+                    statusContent.innerHTML = `<div class="alert alert-success">任务完成！</div>`;
+                    setTimeout(() => {
+                        loadSelectionResult();
+                    }, 1000);
+                } else if (data.status === 'failed') {
+                    let messages = data.messages || [];
+                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    statusContent.innerHTML = `<div class="alert alert-danger">任务失败：<br>${messageHtml}</div>`;
+                } else {
+                    statusContent.innerHTML = `<div class="alert alert-warning">任务不存在</div>`;
+                }
+            })
+            .catch(error => {
+                statusContent.innerHTML = `<div class="alert alert-danger">获取状态失败：${error.message}</div>`;
+            });
+        }
+
+        function loadSelectionResult() {
+            fetch('/api/stock_selection/get_result')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data && data.data.length > 0) {
+                    // 只显示核心列
+                    const allColumns = Object.keys(data.data[0]);
+                    const displayCols = ['股票代码', '入场日期', '入场价格', '当前日期', '当前价格', '收益', '离场类型', '处理时间'];
+                    const columns = displayCols.filter(c => allColumns.includes(c));
+
+                    function isDateCol(col) { return col.includes('日期') || col.includes('时间'); }
+                    function isCodeCol(col) { return col.includes('代码'); }
+                    function isPercentCol(col) { return col.includes('%') || col === '收益'; }
+
+                    function formatCell(col, value) {
+                        if (value === undefined || value === null || value === '') return '-';
+                        const num = parseFloat(value);
+                        if (!isNaN(num) && !isDateCol(col) && !isCodeCol(col)) {
+                            return num.toFixed(2);
+                        }
+                        return value;
+                    }
+
+                    function getCellStyle(col, value) {
+                        const num = parseFloat(value);
+                        if (!isNaN(num) && isPercentCol(col)) {
+                            return num >= 0 ? 'color: green;' : 'color: red;';
+                        }
+                        return '';
+                    }
+
+                    let resultHtml = '<p class="text-muted mb-2">共 ' + data.data.length + ' 条记录';
+                    if (data.source) resultHtml += '（来源: ' + data.source + '）';
+                    resultHtml += '</p>';
+                    resultHtml += '<div style="overflow-x: auto;">';
+                    resultHtml += '<table class="table table-striped table-sm">';
+                    resultHtml += '<thead><tr>';
+                    columns.forEach(col => { resultHtml += '<th>' + col + '</th>'; });
+                    resultHtml += '</tr></thead><tbody>';
+                    data.data.forEach(row => {
+                        resultHtml += '<tr>';
+                        columns.forEach(col => {
+                            const value = row[col];
+                            const style = getCellStyle(col, value);
+                            resultHtml += '<td style="' + style + '">' + formatCell(col, value) + '</td>';
+                        });
+                        resultHtml += '</tr>';
+                    });
+                    resultHtml += '</tbody></table></div>';
+                    document.getElementById('selection-result-content').innerHTML = resultHtml;
+                    document.getElementById('selection-result').style.display = 'block';
+                } else if (data.success) {
+                    document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-info">暂无选股结果（数据文件为空）</div>';
+                    document.getElementById('selection-result').style.display = 'block';
+                } else {
+                    document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-info">' + data.message + '</div>';
+                    document.getElementById('selection-result').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-danger">加载结果失败：' + error.message + '</div>';
+                document.getElementById('selection-result').style.display = 'block';
+            });
+        }
+
+        // 关注股票相关函数
+        function showWatchlist() {
+            document.getElementById('main-page').style.display = 'none';
+            document.getElementById('quick-analysis').style.display = 'none';
+            document.getElementById('trading-records').style.display = 'none';
+            document.getElementById('detailed-mode').style.display = 'none';
+            document.getElementById('single-function').style.display = 'none';
+            document.getElementById('report-viewer').style.display = 'none';
+            document.getElementById('backtest-page').style.display = 'none';
+            document.getElementById('sector-analysis-page').style.display = 'none';
+            document.getElementById('stock-selection-page').style.display = 'none';
+            document.getElementById('watchlist-page').style.display = 'block';
+            loadWatchlist();
+        }
+
+        function loadWatchlist() {
+            fetch('/api/watchlist/get')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let watchlistHtml = '';
+                    if (data.data.length === 0) {
+                        watchlistHtml = '<div class="alert alert-info">关注列表为空</div>';
+                    } else {
+                        watchlistHtml = '<table class="table table-striped">';
+                        watchlistHtml += '<thead><tr><th>股票代码</th><th>股票名称</th><th>操作</th></tr></thead>';
+                        watchlistHtml += '<tbody>';
+                        data.data.forEach(item => {
+                            watchlistHtml += `
+                                <tr>
+                                    <td>${item[0]}</td>
+                                    <td>${item[1] || '-'}</td>
+                                    <td><button class="btn btn-sm btn-danger" onclick="removeFromWatchlist('${item[0]}')">删除</button></td>
+                                </tr>
+                            `;
+                        });
+                        watchlistHtml += '</tbody>';
+                        watchlistHtml += '</table>';
+                    }
+                    document.getElementById('watchlist-container').innerHTML = watchlistHtml;
+                } else {
+                    document.getElementById('watchlist-container').innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('watchlist-container').innerHTML = `<div class="alert alert-danger">加载关注列表失败：${error.message}</div>`;
+            });
+        }
+
+        function addToWatchlist() {
+            const stockCode = document.getElementById('watchlist-stock-code').value.trim();
+            const stockName = document.getElementById('watchlist-stock-name').value.trim();
+            
+            if (!stockCode) {
+                alert('请输入股票代码');
+                return;
+            }
+            
+            fetch('/api/watchlist/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stock_code: stockCode, stock_name: stockName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('添加成功');
+                    document.getElementById('watchlist-stock-code').value = '';
+                    document.getElementById('watchlist-stock-name').value = '';
+                    loadWatchlist();
+                } else {
+                    alert('添加失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('添加失败：' + error.message);
+            });
+        }
+
+        function removeFromWatchlist(stockCode) {
+            if (!confirm(`确定要从关注列表中删除 ${stockCode} 吗？`)) {
+                return;
+            }
+            
+            fetch('/api/watchlist/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ stock_code: stockCode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('删除成功');
+                    loadWatchlist();
+                } else {
+                    alert('删除失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('删除失败：' + error.message);
+            });
         }
     </script>
 </body>

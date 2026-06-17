@@ -7,6 +7,11 @@ from flask import Blueprint, request, jsonify
 
 from .common import get_exchange_suffix
 
+# 添加项目根目录到路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # 创建蓝图
 trading_bp = Blueprint('trading', __name__)
 
@@ -16,6 +21,10 @@ def get_trading_records(stock_code):
     full_stock_code = stock_code + get_exchange_suffix(stock_code)
     
     try:
+        # 强制重新导入trading_records模块
+        if 'trading_records' in sys.modules:
+            del sys.modules['trading_records']
+
         from trading_records import TRADING_RECORDS
         records = TRADING_RECORDS.get(full_stock_code, [])
         return jsonify({
