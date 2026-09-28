@@ -8,15 +8,15 @@
 # 股票代码配置
 STOCK_TICKERS = {
     # 示例，请替换为你的实际股票：
-    # 'example1': '002594.SZ',  # 比亚迪
-    # 'example2': '688052.SH',  # 纳芯微
-    # 'example3': '600313.SH',  # 农发种业
+    # 'example1': '600519.SH',  # 贵州茅台
+    # 'example2': '000858.SZ',  # 五粮液
+    # 'example3': '601318.SH',  # 中国平安
 }
 
 # 交易记录配置
 # 方式一：在此直接定义
 # TRADING_RECORDS = {
-#     '002594.SZ': [
+#     '600519.SH': [
 #         {'date': '2026-01-01', 'type': 'buy', 'price': 100.00, 'shares': 100},
 #     ],
 # }
@@ -25,7 +25,7 @@ STOCK_TICKERS = {
 
 # 历史数据日期配置
 HISTORY_DATE_RANGE = {
-    # '002594.SZ': {
+    # '600519.SH': {
     #     'start_date': '20240101',  # 开始日期，格式：YYYYMMDD
     #     'end_date': '20260331',    # 结束日期，格式：YYYYMMDD
     # },

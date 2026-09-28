@@ -5,11 +5,11 @@
 
 TRADING_RECORDS = {
     # 示例格式：
-    # '002594.SZ': [
-    #     {'date': '2026-01-15', 'type': 'buy', 'price': 250.00, 'shares': 100},
-    #     {'date': '2026-02-20', 'type': 'sell', 'price': 265.00, 'shares': 50},
+    # '600519.SH': [
+    #     {'date': '2026-01-15', 'type': 'buy', 'price': 1500.00, 'shares': 100},
+    #     {'date': '2026-02-20', 'type': 'sell', 'price': 1580.00, 'shares': 50},
     # ],
-    # '600313.SH': [
-    #     {'date': '2026-03-01', 'type': 'buy', 'price': 8.50, 'shares': 5000},
+    # '000858.SZ': [
+    #     {'date': '2026-03-01', 'type': 'buy', 'price': 130.00, 'shares': 500},
     # ],
 }

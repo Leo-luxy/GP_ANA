@@ -25,6 +25,19 @@ log/
 # Sensitive (trading records contain portfolio info)
 trading_records.py
 
+# 敏感配置：含真实股票池与持仓日期，绝不能入库
+# ⚠️ 从 test 同步时务必确认此项存在，否则 config.py 会被带入公开仓库
+config.py
+
+# 运行时任务状态缓存（api/common.py 自动生成，会累积执行日志）
+.task_status_cache.json
+
+# 选股流水线产物（stocks_filter/ 四步自动生成，重跑即可还原）
+stocks_filter/*.csv
+
+# Apple Numbers 工作文件
+*.numbers
+
 # Claude
 CLAUDE.md
 
