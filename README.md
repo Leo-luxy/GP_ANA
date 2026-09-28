@@ -2,6 +2,8 @@
 
 **当前版本：v1.5.0**
 
+**中文** ｜ [English](README_EN.md)
+
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.9--3.12-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
@@ -815,6 +817,7 @@ python stocks_filter/batch_backtest_filter.py # 4. 批量回测 → final_holdin
 | 文档 | 说明 |
 |:---|:---|
 | [**Introduction.md**](Introduction.md) | **技术详解** —— 系统架构、五维决策算法、模块技术档案、数据字典、API 参考、设计决策 |
+| [README_EN.md](README_EN.md) | **English documentation** —— 英文版说明文档 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南 |
 | [SECURITY.md](SECURITY.md) | 安全政策 |
