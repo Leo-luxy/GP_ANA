@@ -703,6 +703,85 @@ python check_data_updates.py --mode all      --ticker 300433.SZ  # 全部
 - **报告聚合**：把技术面、基本面、市场情绪三类报告的核心内容合并进同一提示词。
 - 9 步流程：加载历史行情 → 算支撑/阻力 → 绘图 → 加载基本信息与估值 → 加载各分析报告 → 由交易记录算持仓 → 生成综合提示词 → 取 AI 结果 → 保存结果与提示词。
 
+### 5.19 analyze_technical_trend.py
+
+| 项目 | 内容 |
+|:---|:---|
+| **作用** | 技术趋势 LLM 分析 —— 读取结构化技术趋势数据，结合持仓记录调用本地 Ollama 给出操作建议 |
+| **数据源** | 本地 Ollama AI |
+| **输入** | `{ticker}_technical_trend_analysis.json`、`{ticker}_company_basic.json`、`trading_records.py` |
+| **输出** | `{ticker}_technical_trend_llm_analysis_{ts}.md` + 提示词文件 |
+| **调用** | `python analyze_technical_trend.py --strategy trend_following --ticker 300433.SZ` |
+
+- **四种策略视角**（`--strategy`）：`trend_following` / `mean_reversion` / `swing` / `neutral`
+- **持仓计算支持 FIFO**：`calculate_fifo_position()` 按先进先出还原真实持仓成本
+- **被「快速分析」流程调用**：`api/quick_analysis.py` 每日更新流程的最后一步就是它
+- 核心方法：`load_technical_trend_data()`、`get_stock_info()`、`generate_ai_prompt()`、`get_ai_analysis()`、`save_analysis_to_md()`
+
+### 5.20 daily/stock_ai_local_analyzer.py
+
+| 项目 | 内容 |
+|:---|:---|
+| **作用** | 日线 K 线 AI 分析 —— 计算支撑/阻力位并绘图，再调用本地 Ollama 输出操作建议 |
+| **数据源** | 本地 Ollama AI |
+| **输入** | `{ticker}_qfq.csv`、`{ticker}_company_basic.json`、`trading_records.py` |
+| **输出** | `{ticker}_{ts}.md`（分析报告）、`{ticker}_support_resistance.png` |
+| **调用** | `python daily/stock_ai_local_analyzer.py --ticker 300433.SZ` |
+
+- **支撑阻力位自算**：`calculate_support_resistance()` 计算关键价位，`plot_support_resistance()` 绘制成图
+- **持仓还原**：`calculate_position_from_trading_records()` 从交易记录反算持仓；也支持手工设置（`set_position()`）与逐笔操作（`add_operation()`）
+- 提示词中注入**公司信息、财务摘要、支撑阻力位、当前持仓**，因此建议能结合个人成本
+- 核心方法：`load_data()`、`get_stock_info()`、`get_company_details()`、`get_stock_summary()`、`generate_ai_prompt()`、`run_analysis()`
+
+### 5.21 trend_following_backtest.py / trend_following_backtest_simplified.py
+
+| 项目 | 内容 |
+|:---|:---|
+| **作用** | 趋势跟踪策略回测引擎（完整版 + 简化版） |
+| **数据源** | 纯本地计算 |
+| **输入** | `{ticker}_qfq.csv` |
+| **输出** | 交易明细 CSV + 回测结果图表 |
+| **调用** | `python trend_following_backtest.py [--mode full\|simple] [--ticker 300433.SZ]` |
+
+**两种策略模式**（`_simplified.py` 为简化实现）：
+
+| 参数 | `full` | `simple` | 含义 |
+|:---|--:|--:|:---|
+| `adx_threshold` | 25 | 25 | ADX 趋势强度门槛 |
+| `confirmation_days` | 3 | 1 | 趋势确认所需天数 |
+| `slope_threshold` | 0.005 | — | 均线斜率门槛 |
+| `max_recent_days` | 5 | 5 | 近期信号回溯窗口 |
+| `volume_ratio_threshold` | 1.2 | 1.1 | 量能放大倍数要求 |
+| `atr_stop_multiplier` | 3.0 | 3.0 | ATR 止损倍数 |
+| `exit_adx_threshold` | 25 | 25 | 离场 ADX 门槛 |
+| `trailing_ma_period` | 20 | 20 | 移动止盈均线周期 |
+| `chandelier_atr_multiplier` | 3.0 | 3.0 | 吊灯止损 ATR 倍数 |
+| `profit_target_atr` | 2.0 | 2.0 | 止盈目标（ATR 倍数） |
+
+**离场类型**：`stop_loss`（ATR 止损）、`trailing_ma`（移动均线止盈）、`trailing_stop`（吊灯止损）、`profit_target`（ATR 止盈）
+
+**核心方法**：`load_data()`、`_calculate_base_indicators()`、`_calculate_swing_lows()`、`_generate_signals()`、`run_backtest()`、`save_trades_to_csv()`、`plot_results()`
+
+> ⚠️ 完整版与简化版**必须同步修改**，否则两者行为不一致。
+
+### 5.22 backtest_all_stocks.py / backtest_all_stocks_simplified.py
+
+| 项目 | 内容 |
+|:---|:---|
+| **作用** | 全量股票批量回测 + 生成监控报告 |
+| **数据源** | 纯本地计算 |
+| **输入** | 各股票 `{ticker}_qfq.csv` |
+| **输出** | `{ticker}_backtest_{ts}.png`（每股图表）、`{ticker}_backtest_{ts}.csv`、`monitor_report_{ts}.md`（监控报告） |
+| **调用** | `python backtest_all_stocks.py --mode full` |
+
+- `--mode full`：严格多头排列（MA5 > MA10 > MA20 > MA60）
+- `--mode simple`：宽松多头排列（MA5 > MA20）
+- **监控报告**逐只列出当前持仓状态，并在表格中自动附加**公司简称**（`get_company_name()` 读取 `_company_basic.json`）
+- 7 个函数：`get_all_stocks()`、`get_company_name()`、`run_batch_backtest()`、`analyze_results()`、`generate_suggestions()`、`generate_monitor_report()`
+
+> 💡 该报告由 Web 界面「策略回测」页面读取展示（`api/backtest.py` 的 `/get_report`）。
+> 报告按日期命名，取最新一份的逻辑见 `api/backtest.py` 的 `_latest_file()`。
+
 ---
 
 ## 6. 数据字典
