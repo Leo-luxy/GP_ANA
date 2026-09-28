@@ -20,6 +20,8 @@
 **适用人群：** 希望用数据驱动决策的个人投资者、量化策略研究者、以及需要批量跟踪多只股票的活跃交易者。
 
 > **📌 第一次使用？** 直接跳到 [🚀 快速开始](#-快速开始从零到跑起来)，按 11 个步骤操作即可。整个部署约需 20 分钟（不含 AI 模型下载时间）。
+>
+> **📌 想深入了解内部实现？** 见 **[Introduction.md](Introduction.md)** —— 架构、算法、数据结构与设计决策的技术详解。
 
 ---
 
@@ -884,13 +886,11 @@ rm -rf data/*        # 注意：会删除所有已生成的分析报告与图表
 
 | 文档 | 说明 |
 |:---|:---|
-| [CHANGELOG.md](CHANGELOG.md) | 详细版本变更记录 |
-| [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | 部署说明（⚠️ 部分内容已过时，以本 README 为准） |
+| [**Introduction.md**](Introduction.md) | **技术详解** —— 系统架构、五维决策算法、模块技术档案、数据字典、API 参考、设计决策 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献指南 |
 | [SECURITY.md](SECURITY.md) | 安全政策 |
-| [程序功能说明.md](程序功能说明.md) | 各模块功能详解 |
-| [操作流程.md](操作流程.md) | 操作流程说明 |
-| [说明书.md](说明书.md) | 完整使用说明书 |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | 行为准则 |
 
 ---
 
