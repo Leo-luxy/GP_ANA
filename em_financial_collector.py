@@ -56,7 +56,11 @@ class EastmoneyFinancialCollector:
                 response = requests.get(url, params=params, headers=self.headers, timeout=10)
                 response.raise_for_status()
                 data = response.json()
-                
+
+                if data is None:
+                    print("警告：返回的JSON为null")
+                    return []
+
                 if "result" in data and "data" in data["result"]:
                     return data["result"]["data"]
                 elif "data" in data:

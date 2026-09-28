@@ -1,7 +1,7 @@
 # eastmoney_fetcher.py
 # 统一的东方财富数据中心数据获取器
 # --type market_performance | industry_valuation | industry_peers | industry_growth | dupont
-# 每种 type 的输出格式与 GP_ANA_V3 的独立 fetch 脚本完全一致
+# 每种 type 的输出格式与早期独立 fetch 脚本完全一致
 import requests
 import json
 import os

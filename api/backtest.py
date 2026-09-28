@@ -24,6 +24,24 @@ try:
 except ImportError:
     DATA_DIR = "./data"
 
+def _extract_date(filename):
+    """从文件名中提取 8 位日期，用于按真实日期排序。
+
+    ⚠️ 不能直接用字符串排序：'monitor_report_simplified_20260527.md' 中的
+    's' 大于数字 '2'，字符串降序会把它排到 'monitor_report_20260928.md' 前面，
+    导致页面显示几百天前的过时报告。
+    """
+    m = re.search(r'(\d{8})', filename)
+    return m.group(1) if m else '00000000'
+
+def _latest_file(files):
+    """按真实日期取最新文件；日期相同时优先非简化版。"""
+    return sorted(
+        files,
+        key=lambda f: (_extract_date(f), 0 if 'simplified' in f else 1),
+        reverse=True
+    )[0]
+
 def get_company_name(ticker):
     """获取股票的公司简称"""
     company_file = os.path.join(DATA_DIR, ticker, f"{ticker}_company_basic.json")
@@ -275,8 +293,8 @@ def get_stock_list():
                         png_files.append(f)
                 
                 if png_files:
-                    # 按日期排序，取最新的
-                    png_files.sort(reverse=True)
+                    # 按真实日期排序，取最新的
+                    png_files.sort(key=_extract_date, reverse=True)
                     stocks.append({
                         'ticker': item,
                         'chart_path': f"{item}/{png_files[0]}"
@@ -309,8 +327,7 @@ def get_report():
                 'message': '未找到监控报告'
             })
         
-        report_files.sort(reverse=True)
-        report_path = os.path.join(DATA_DIR, report_files[0])
+        report_path = os.path.join(DATA_DIR, _latest_file(report_files))
     
     with open(report_path, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -390,8 +407,7 @@ def get_backtest_results():
                 'message': '未找到回测结果'
             })
         
-        result_files.sort(reverse=True)
-        results_path = os.path.join(DATA_DIR, result_files[0])
+        results_path = os.path.join(DATA_DIR, _latest_file(result_files))
     
     df = pd.read_csv(results_path)
     return jsonify({

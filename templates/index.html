@@ -252,7 +252,7 @@
                         <div class="row">
                             <div class="col-md-3">
                                 <label for="trade-date" class="form-label">日期</label>
-                                <input type="date" id="trade-date" class="form-control" value="2026-03-14">
+                                <input type="date" id="trade-date" class="form-control">
                             </div>
                             <div class="col-md-3">
                                 <label for="trade-type" class="form-label">类型</label>
@@ -617,7 +617,7 @@
     <!-- 版本信息 -->
     <div class="container mt-4 mb-4">
         <div class="text-center text-muted">
-            <p>版本：v1.4.0 | 修改日期：2026-06-17</p>
+            <p>版本：v1.5.0 | 修改日期：2026-09-28</p>
         </div>
     </div>
     
@@ -1087,8 +1087,8 @@
             .then(data => {
                 if (data.success) {
                     alert('交易记录添加成功');
-                    // 清空表单
-                    document.getElementById('trade-date').value = '';
+                    // 重置表单（日期回到今天）
+                    document.getElementById('trade-date').value = todayStr();
                     document.getElementById('trade-price').value = '';
                     document.getElementById('trade-shares').value = '';
                     // 重新加载交易记录
@@ -2059,6 +2059,18 @@
                 alert('删除失败：' + error.message);
             });
         }
+
+        // 返回本地日期 YYYY-MM-DD，用作日期输入框的默认值
+        function todayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        // 初始化：交易记录日期默认显示今天
+        (function initTradeDate() {
+            const el = document.getElementById('trade-date');
+            if (el) el.value = todayStr();
+        })();
     </script>
 </body>
 </html>

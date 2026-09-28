@@ -2,6 +2,7 @@
 # API 模块共享代码：交易所映射、任务队列管理
 import os
 import sys
+import json
 import subprocess
 import time
 import threading
@@ -12,9 +13,35 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
 # ============================================================
+# 任务状态持久化（避免重启后任务丢失）
+# ============================================================
+TASK_STATUS_FILE = os.path.join(project_root, '.task_status_cache.json')
+
+def _load_task_status():
+    """从文件加载已保存的任务状态"""
+    if os.path.exists(TASK_STATUS_FILE):
+        try:
+            with open(TASK_STATUS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"  加载任务状态缓存失败: {e}")
+    return {}
+
+def _save_task_status():
+    """将 task_status 持久化到文件"""
+    try:
+        # 只保存非 running 状态的任务（running 的任务重启后无法恢复）
+        saved = {k: v for k, v in task_status.items()
+                 if v.get('status') in ('completed', 'failed', 'not_found')}
+        with open(TASK_STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(saved, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"  保存任务状态缓存失败: {e}")
+
+# ============================================================
 # 股票代码 → 交易所后缀
 # ============================================================
-SSE_PREFIXES = ['600', '601', '603', '688']  # 上海证券交易所
+SSE_PREFIXES = ['600', '601', '603', '605', '688']  # 上海证券交易所（含 605 主板）
 SZSE_PREFIXES = ['000', '001', '002', '300']  # 深圳证券交易所
 
 def get_exchange_suffix(stock_code: str) -> str:
@@ -31,7 +58,7 @@ def get_exchange_suffix(stock_code: str) -> str:
 # 统一任务队列和状态管理
 # ============================================================
 task_queue = queue.Queue()
-task_status = {}
+task_status = _load_task_status()
 
 def execute_step(step_name: str, command: str, cwd: str, messages: list, timeout_seconds: int = 300) -> tuple:
     """
@@ -96,6 +123,7 @@ def _execute_steps(task_id, full_stock_code, steps, label):
     os.makedirs(data_dir, exist_ok=True)
 
     task_status[task_id] = {'status': 'running', 'progress': 0, 'messages': []}
+    _save_task_status()
     messages.append(label)
     total_steps = len(steps)
     messages.append(f"共 {total_steps} 个步骤，按顺序执行")
@@ -107,6 +135,7 @@ def _execute_steps(task_id, full_stock_code, steps, label):
             'progress': int((i / total_steps) * 100),
             'messages': messages.copy()
         }
+        _save_task_status()
         # 根据步骤类型设置不同的超时时间
         timeout_seconds = 300  # 默认5分钟
 
@@ -133,11 +162,13 @@ def _execute_steps(task_id, full_stock_code, steps, label):
             'progress': int(((i + 1) / total_steps) * 100),
             'messages': messages.copy()
         }
+        _save_task_status()
 
     task_status[task_id] = {
         'status': 'completed', 'progress': 100,
         'messages': messages, 'stock_code': full_stock_code
     }
+    _save_task_status()
     messages.append("========== 分析完成 ==========")
 
 
@@ -205,6 +236,7 @@ def run_analysis_task(task_id: str, stock_code: str, task_type: str):
         _execute_steps(task_id, full_stock_code, steps, label)
     except Exception as e:
         task_status[task_id] = {'status': 'failed', 'progress': 100, 'messages': [f'任务执行失败：{str(e)}']}
+        _save_task_status()
 
 
 # ============================================================
@@ -246,6 +278,7 @@ def run_quick_task(task_id: str, stock_code: str, task_type: str, strategy_mode:
         _execute_steps(task_id, full_stock_code, steps, label)
     except Exception as e:
         task_status[task_id] = {'status': 'failed', 'progress': 100, 'messages': [f'任务执行失败：{str(e)}']}
+        _save_task_status()
 
 
 # ============================================================

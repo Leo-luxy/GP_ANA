@@ -17,7 +17,7 @@ from config import DATA_DIR
 # 当前文件所在目录（stocks_filter）
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 项目根目录（GP_ANA_V3）
+# 项目根目录
 PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 
 
