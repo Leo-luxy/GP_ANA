@@ -1,14 +1,44 @@
-yfinance
+# GP_ANA 依赖清单
+#
+# 安装：pip install -r requirements.txt
+#
+# ⚠️ Python 版本：推荐 3.10 / 3.11
+# ⚠️ 安装前请先装好 TA-Lib 系统 C 库，否则 TA-Lib 会编译失败
+#    详见 README.md 的「第 3 步：安装 TA-Lib 系统库」
+
+# --- Web 服务 ---
+flask
+
+# --- 数据处理 ---
 pandas
 numpy==1.26.3
-pandas-datareader==0.10.0
-tushare==1.2.89
+
+# --- 数据源 ---
 akshare==1.18.39
+tushare==1.2.89
+
+# --- 技术指标 ---
 TA-Lib==0.6.8
-py_mini_racer
-requests==2.32.3
+
+# --- 图表可视化 ---
 matplotlib==3.9.2
-ollama==0.6.1
-demjson
 seaborn
+
+# --- AI / 机器学习 ---
+ollama==0.6.1
 scikit-learn
+
+# --- 其他 ---
+requests==2.32.3
+py_mini_racer
+
+# ---------------------------------------------------------------------------
+# 已移除的依赖（2026-09 清理，经扫描确认项目代码零引用）：
+#
+#   demjson            — 依赖 Python 3.12 已移除的 imp 模块，
+#                        是此前 Python 3.12+ 无法安装依赖的主因
+#   pandas-datareader  — 项目代码未引用
+#   yfinance           — 项目代码未引用
+#
+# 若某个数据抓取功能报 ModuleNotFoundError，可按需把对应包加回来。
+# ---------------------------------------------------------------------------
