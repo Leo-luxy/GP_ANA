@@ -84,7 +84,8 @@ def process_single_stock(ticker, skip_data_collection=False):
         cmd = f"python {os.path.join(PROJECT_ROOT, 'data_collector.py')} --ticker {ticker}"
         success = run_command(cmd, f"获取 {ticker} 行情数据")
         if not success:
-            print(f"警告：获取 {ticker} 行情数据失败，尝试继续")
+            print(f"错误：获取 {ticker} 行情数据失败，跳过该股票（不用旧数据继续回测）")
+            return None
     
     # 2. 计算技术指标
     cmd = f"python {os.path.join(PROJECT_ROOT, 'daily', 'stock_daily_indicator_calculator.py')} --ticker {ticker}"

@@ -2,6 +2,14 @@
 # 项目配置文件示例
 # 使用方法：复制此文件为 config.py，然后填入你的实际配置
 
+# 网络代理守护：本项目数据源均为国内站点，默认直连、不使用系统代理，
+# 避免系统代理设置残留导致抓取失败。详见 net_guard.py
+try:
+    from net_guard import ensure_network_ready as _ensure_network_ready
+    _ensure_network_ready()
+except Exception:
+    pass
+
 # 6开头 ：上海证券交易所（SH）
 # 0开头 ：深圳证券交易所（SZ）
 # 3开头 ：深圳证券交易所创业板（SZ）

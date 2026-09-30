@@ -8,6 +8,10 @@ from flask import Flask, render_template, request, jsonify, send_file
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# 网络代理守护：默认直连、不使用系统代理（子进程会继承该设置）
+from net_guard import ensure_network_ready
+ensure_network_ready()
+
 app = Flask(__name__)
 
 # 导入API模块

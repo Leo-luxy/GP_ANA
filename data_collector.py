@@ -7,12 +7,21 @@ https://finance.sina.com.cn/realstock/company/sh689009/nc.shtml
 """
 
 import json
+import os
 import re
+import sys
 import random
 import time
 import pandas as pd
 import py_mini_racer
 import requests
+
+# 网络代理守护：默认直连、不使用系统代理。否则系统代理设置残留时，
+# 新浪财经的请求会全部抛 ProxyError，抓取静默失败。
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from net_guard import ensure_network_ready, retry_on_proxy_error
+
+ensure_network_ready()
 
 from akshare.stock.cons import (
     zh_sina_a_stock_payload,
@@ -495,6 +504,7 @@ if __name__ == "__main__":
         print(f"批量处理所有股票，共 {len(ticker_list)} 只")
     
     # 遍历处理每只股票
+    failed_tickers = []
     for ticker_code in ticker_list:
         # 查找对应的股票名称
         ticker_name = ticker_code
@@ -557,12 +567,15 @@ if __name__ == "__main__":
         time.sleep(random.uniform(2, 4))
         
         # 获取数据
+        fetch_ok = False
         try:
-            stock_zh_a_daily_df = stock_zh_a_daily(
+            stock_zh_a_daily_df = retry_on_proxy_error(
+                stock_zh_a_daily,
                 symbol=stock_symbol, start_date=start_date, end_date=end_date, adjust="qfq"
             )
             
             if not stock_zh_a_daily_df.empty:
+                fetch_ok = True
                 # 排序数据
                 data = stock_zh_a_daily_df.sort_values('date', ascending=True)
                 
@@ -599,4 +612,16 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"获取数据出错: {e}")
         
+        if not fetch_ok:
+            failed_tickers.append(ticker_code)
+        
         print()  # 空行分隔不同股票的输出
+
+    # 取数失败的股票不应被当成「数据已是最新」继续使用
+    if failed_tickers:
+        print(f"取数失败 {len(failed_tickers)} 只：{failed_tickers}")
+        if args.ticker:
+            # 单只股票模式：由调用方决定是否跳过（batch_backtest_filter 会跳过该股）
+            sys.exit(2)
+        elif len(failed_tickers) == len(ticker_list):
+            sys.exit(2)

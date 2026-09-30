@@ -3,12 +3,22 @@ step2_daily_basic.py
 功能：读取 step1 保存的临时行情 CSV，调用 Tushare pro.daily_basic()
       获取换手率、市值等指标，合并后保存为最终中文列名 CSV
 运行时机：step1 运行完至少 1 小时后
+
+取数失败时以非 0 退出码结束（旧版本用 exit(0)，导致调用方以为这步成功了）。
 """
+
+import os
+import sys
+import datetime
 
 import tushare as ts
 import pandas as pd
-import datetime
-import os
+
+# 网络代理守护：默认直连、不使用系统代理，必须在联网请求之前导入
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from net_guard import ensure_network_ready, retry_on_proxy_error
+
+ensure_network_ready()
 
 # ==================== 配置 ====================
 TUSHARE_TOKEN = "YOUR_TUSHARE_TOKEN"              # 替换为真实 token
@@ -26,15 +36,13 @@ input_path = os.path.join(STOCKS_FILTER_DIR, INPUT_TEMP)
 print(f"读取临时文件：{input_path}")
 
 if not os.path.exists(input_path):
-    print(f"错误：未找到临时文件 {input_path}")
-    print("程序将继续执行")
-    exit(0)
+    print(f"错误：未找到临时文件 {input_path}，请先成功运行 step1_daily.py")
+    sys.exit(2)
 
 df_daily = pd.read_csv(input_path)
 if df_daily.empty:
-    print("错误：临时文件为空，请确认 step1 是否成功运行。")
-    print("程序将继续执行")
-    exit(0)
+    print("错误：临时文件为空，请先成功运行 step1_daily.py")
+    sys.exit(2)
 
 # 获取数据日期（取 trade_date 的第一条）
 trade_date = str(df_daily['trade_date'].iloc[0])
@@ -46,38 +54,25 @@ fields = ("ts_code,turnover_rate,turnover_rate_f,volume_ratio,"
           "total_share,float_share,free_share,total_mv,circ_mv")
 print("正在获取 daily_basic 数据...")
 
-df_basic = None
 try:
-    df_basic = pro.daily_basic(trade_date=trade_date, fields=fields)
+    df_basic = retry_on_proxy_error(pro.daily_basic, trade_date=trade_date, fields=fields)
     print(f"获取到 {len(df_basic)} 条基础指标记录")
 except Exception as e:
-    error_msg = str(e)
-    print(f"获取 daily_basic 数据失败: {error_msg}")
-    
-    # 检查是否是频率限制
-    if "频率超限" in error_msg or "limit" in error_msg.lower():
-        print("检测到 Tushare 访问频率限制，尝试读取历史数据...")
-        
-        # 尝试读取已有的完整数据文件
-        output_path = os.path.join(STOCKS_FILTER_DIR, OUTPUT_FINAL)
-        if os.path.exists(output_path):
-            df_full = pd.read_csv(output_path)
-            print(f"成功读取历史完整数据，共 {len(df_full)} 条记录")
-            print(f"数据已保存至：{output_path}")
-            # print("接下来所有筛选测试请直接读取该 CSV，无需再调用 Tushare API。")
-            exit(0)
-        else:
-            print("未找到历史完整数据文件，程序将继续执行")
-    else:
-        print("程序将继续执行")
+    print(f"获取 daily_basic 数据失败: {e}")
+    print("本步骤未取得数据，已中止，避免用旧数据继续筛选。")
+    sys.exit(2)
 
 if df_basic is None or df_basic.empty:
-    print("未能获取或读取 daily_basic 数据，但程序将继续执行")
-    exit(0)
+    print(f"交易日 {trade_date} 未取到 daily_basic 数据，已中止，避免用旧数据继续筛选。")
+    sys.exit(2)
 
 # 3. 合并（按 ts_code）
 df_full = pd.merge(df_daily, df_basic, on='ts_code', how='inner')
 print(f"合并后共 {len(df_full)} 条记录")
+
+if df_full.empty:
+    print("错误：合并后为空，行情与基础指标日期可能不一致。")
+    sys.exit(2)
 
 # 4. 列名中英文映射
 COLUMN_MAP = {

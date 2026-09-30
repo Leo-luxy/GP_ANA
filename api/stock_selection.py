@@ -52,6 +52,15 @@ def run_command_with_output(task_id, cmd, cwd, description):
         selection_tasks[task_id]['messages'] = messages.copy()
         return False
 
+def _fail_selection(task_id, messages, reason):
+    """取数失败时中止任务：绝不让旧数据被当成今天的结果展示"""
+    messages.append(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 任务中止：{reason}")
+    messages.append("本次未生成新的选股结果；页面上显示的仍是上一次的结果文件，请留意其中的日期。")
+    selection_tasks[task_id]['status'] = 'failed'
+    selection_tasks[task_id]['messages'] = messages.copy()
+    return False
+
+
 def run_selection(task_id, preliminary, detailed):
     # 当前文件位于 api 目录，需要获取项目根目录，然后定位到 stocks_filter
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -70,30 +79,42 @@ def run_selection(task_id, preliminary, detailed):
         selection_tasks[task_id]['messages'] = messages.copy()
         
         if preliminary:
-            run_command_with_output(task_id,
+            ok = run_command_with_output(task_id,
                 [sys.executable, os.path.join(base_path, 'step1_daily.py')],
                 base_path,
                 "执行 step1_daily.py - 获取全市场日线行情"
             )
+            if not ok:
+                return _fail_selection(task_id, messages,
+                    "step1_daily.py 未取到行情数据（常见原因：系统代理未启动导致断网、Tushare 限流或权限问题）")
             
-            run_command_with_output(task_id,
+            ok = run_command_with_output(task_id,
                 [sys.executable, os.path.join(base_path, 'step2_daily_basic.py')],
                 base_path,
                 "执行 step2_daily_basic.py - 获取基础指标并合并"
             )
+            if not ok:
+                return _fail_selection(task_id, messages,
+                    "step2_daily_basic.py 未取到基础指标数据")
             
-            run_command_with_output(task_id,
+            ok = run_command_with_output(task_id,
                 [sys.executable, os.path.join(base_path, 'step3_filter.py')],
                 base_path,
                 "执行 step3_filter.py - 执行初步筛选"
             )
+            if not ok:
+                return _fail_selection(task_id, messages,
+                    "step3_filter.py 执行失败")
         
         if detailed:
-            run_command_with_output(task_id,
+            ok = run_command_with_output(task_id,
                 [sys.executable, os.path.join(base_path, 'batch_backtest_filter.py')],
                 base_path,
                 "执行 batch_backtest_filter.py - 批量回测筛选"
             )
+            if not ok:
+                return _fail_selection(task_id, messages,
+                    "batch_backtest_filter.py 执行失败")
         
         messages.append(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] ========== 读取市场选股结果 ==========")
         
