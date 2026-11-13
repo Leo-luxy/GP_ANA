@@ -434,23 +434,30 @@ AI 走本地 Ollama，也**不需要**任何云端 API key。
 
 **1）申请**：注册并登录 <https://tushare.pro/> → 「个人主页 → 接口 TOKEN」→ 复制你的 token
 
-**2）填进两个文件**（注意是**两个**）：
+**2）填进一个文件**：项目根目录的 `tushare_client.py`
 
 ```python
-# stocks_filter/step1_daily.py 第 15 行
-TUSHARE_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← 替换成你的真实 token
+# tushare_client.py
+PRIMARY_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← 替换成你的真实 token
+BACKUP_TOKENS = [
+    # 可选：填入其它账号的 token；主 token 命中"频率超限"时会自动切换
+]
 ```
 
-```python
-# stocks_filter/step2_daily_basic.py 第 14 行
-TUSHARE_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← 换成同一个 token
-```
+> 💡 **为什么只有一个文件**：token 集中在 `tushare_client.py` 管理，选股脚本通过 `TusharePool`
+> 调用接口，不再各自写死 token。命中「频率超限」时会自动换下一个 token 重试同一请求；
+> 所有 token 都限流才回退。也可以用环境变量覆盖，完全不改文件：
+>
+> ```bash
+> export GP_TUSHARE_TOKENS="主token,备用token"
+> ```
 
 **3）注意 Tushare 积分**：全市场日线接口（`pro.daily()`）需要 **120 积分以上**。
 新账号默认积分不够，会提示权限不足，需先在 Tushare 官网完成积分任务。
 
-> ⚠️ **安全提醒**：这两个文件**是被 git 跟踪的**。如果你打算把自己的改动提交回公开仓库，
-> 请务必先把 token 改回 `YOUR_TUSHARE_TOKEN`，或改用环境变量注入。详见 [安全注意事项](#-安全注意事项)。
+> ⚠️ **安全提醒**：`tushare_client.py` **是被 git 跟踪的**。若你要把改动提交回公开仓库，
+> 请务必先把 token 改回 `YOUR_TUSHARE_TOKEN`，或改用 `GP_TUSHARE_TOKENS` 环境变量注入。
+> 详见 [安全注意事项](#-安全注意事项)。
 
 ---
 
@@ -598,8 +605,7 @@ python sector_data_collector.py --type industry --top 30
 |:---|:---|:---|:---:|
 | **`config.py`** | 复制 `config.example.py` | ① `STOCK_TICKERS` 填股票代码<br>② `AI_CONFIG.model` 填模型名 | ✅ **必须** |
 | **`trading_records.py`** | 复制 `trading_records.example.py` | 按格式填真实买卖记录 | 建议 |
-| **`stocks_filter/step1_daily.py`** | 仓库自带 | 第 15 行 `TUSHARE_TOKEN` | 仅市场选股 |
-| **`stocks_filter/step2_daily_basic.py`** | 仓库自带 | 第 14 行 `TUSHARE_TOKEN` | 仅市场选股 |
+| **`tushare_client.py`** | 仓库自带 | `PRIMARY_TOKEN`（可选 `BACKUP_TOKENS`） | 仅市场选股 |
 | **`watchlist.py`** | 仓库自带 | 关注股票列表（建议用 Web 界面改） | 否 |
 | `data/`、`log/` | 手动创建 | —— | ✅ **必须** |
 
@@ -721,15 +727,14 @@ app.run(host='127.0.0.1', port=8081, debug=False)   # 仅本机可访问，关�
 
 **2）Tushare token 不要提交到公开仓库**
 
-`stocks_filter/step1_daily.py` 和 `stocks_filter/step2_daily_basic.py` **是被 git 跟踪的文件**。
+`tushare_client.py` **是被 git 跟踪的文件**（token 已从各脚本集中到这里）。
 填入真实 token 后一旦 `git commit`，token 就永久留在了 commit 历史里。
 
-- 提交前务必改回 `"YOUR_TUSHARE_TOKEN"`
-- 更稳妥的写法是改用环境变量：
+- 提交前务必改回 `"YOUR_TUSHARE_TOKEN"`，备用 token 列表清空
+- 更稳妥的做法是用环境变量覆盖，完全不改文件：
 
-```python
-import os
-TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")
+```bash
+export GP_TUSHARE_TOKENS="主token,备用token"
 ```
 
 - 若已误提交，请立即到 Tushare 官网**重置 token**

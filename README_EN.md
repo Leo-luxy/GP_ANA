@@ -453,25 +453,32 @@ free public endpoint requiring **no key at all**; AI runs on local Ollama and ne
 
 **1) Apply**: register and sign in at <https://tushare.pro/> → "Profile → API TOKEN" → copy your token
 
-**2) Put it in two files** (note: **two**):
+**2) Put it in one file**: `tushare_client.py` in the project root
 
 ```python
-# stocks_filter/step1_daily.py, line 15
-TUSHARE_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← replace with your real token
+# tushare_client.py
+PRIMARY_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← replace with your real token
+BACKUP_TOKENS = [
+    # Optional: other accounts' tokens; used automatically when the primary hits a rate limit
+]
 ```
 
-```python
-# stocks_filter/step2_daily_basic.py, line 14
-TUSHARE_TOKEN = "YOUR_TUSHARE_TOKEN"     # ← same token here
-```
+> 💡 **Why a single file**: tokens are managed centrally in `tushare_client.py`; the screening scripts call
+> the API through `TusharePool` instead of hard-coding tokens. A rate-limited call is retried with the next
+> token, and only falls back when every token is limited. You can also override by environment variable
+> without editing the file:
+>
+> ```bash
+> export GP_TUSHARE_TOKENS="primary,backup"
+> ```
 
 **3) Mind the Tushare points system**: the whole-market daily endpoint (`pro.daily()`) requires **120+ points**.
 New accounts don't have enough by default and will see a permission error — complete the points tasks on the
 Tushare website first.
 
-> ⚠️ **Security note**: these two files **are tracked by git**. If you ever commit your changes back to a public
-> repository, change the token back to `YOUR_TUSHARE_TOKEN` first, or switch to reading it from an environment
-> variable. See [Security Notes](#-security-notes).
+> ⚠️ **Security note**: `tushare_client.py` **is tracked by git**. If you commit your changes back to a public
+> repository, change the token back to `YOUR_TUSHARE_TOKEN` first, or inject it via the
+> `GP_TUSHARE_TOKENS` environment variable. See [Security Notes](#-security-notes).
 
 ---
 
@@ -626,8 +633,7 @@ After deployment you only need to care about these files:
 |:---|:---|:---|:---:|
 | **`config.py`** | Copy from `config.example.py` | ① `STOCK_TICKERS` — your stock codes<br>② `AI_CONFIG.model` — your model name | ✅ **Yes** |
 | **`trading_records.py`** | Copy from `trading_records.example.py` | Your real trades, in the documented format | Recommended |
-| **`stocks_filter/step1_daily.py`** | Ships with the repo | Line 15, `TUSHARE_TOKEN` | Stock screening only |
-| **`stocks_filter/step2_daily_basic.py`** | Ships with the repo | Line 14, `TUSHARE_TOKEN` | Stock screening only |
+| **`tushare_client.py`** | Ships with the repo | `PRIMARY_TOKEN` (optional `BACKUP_TOKENS`) | Stock screening only |
 | **`watchlist.py`** | Ships with the repo | Your watchlist (easier via the Web UI) | No |
 | `data/`, `log/` | Create manually | — | ✅ **Yes** |
 
@@ -755,15 +761,14 @@ app.run(host='127.0.0.1', port=8081, debug=False)   # localhost only, debugger o
 
 **2) Never commit your Tushare token**
 
-`stocks_filter/step1_daily.py` and `stocks_filter/step2_daily_basic.py` **are tracked by git**.
-Once you put a real token in them and `git commit`, the token is permanently in the commit history.
+`tushare_client.py` **is tracked by git** (tokens were moved out of the individual scripts).
+Once you put a real token in it and `git commit`, the token is permanently in the commit history.
 
-- Always change it back to `"YOUR_TUSHARE_TOKEN"` before committing
-- Better still, read it from an environment variable:
+- Always change it back to `"YOUR_TUSHARE_TOKEN"` and clear the backup list before committing
+- Better still, override it with an environment variable and leave the file untouched:
 
-```python
-import os
-TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")
+```bash
+export GP_TUSHARE_TOKENS="primary,backup"
 ```
 
 - If you have already committed it, **reset the token** on the Tushare website immediately

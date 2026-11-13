@@ -109,6 +109,7 @@ GP_ANA/
 | 可视化 | matplotlib、seaborn |
 | LLM | Ollama 本地推理（默认 `http://localhost:11434`） |
 | 数据源 | akshare、东方财富数据中心 API、新浪财经、Tushare |
+| 凭据与配额 | `tushare_client.py` 主备 token 池：命中频率超限自动切换，可用 `GP_TUSHARE_TOKENS` 覆盖 |
 
 ---
 
