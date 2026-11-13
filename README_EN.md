@@ -872,7 +872,7 @@ See [CHANGELOG.md](CHANGELOG.md) for details.
 
 | Role | Member |
 |:---|:---|
-| Author / Maintainer | **Luxinyu** — requirements, strategy and engineering, data validation |
+| Author / Maintainer | **[Leo-luxy](https://github.com/Leo-luxy)** — requirements, strategy and engineering, data validation |
 | Development support | **dsh** (DeepSeek Harness) — code review, test hardening and documentation |
 
 If you have used this project, made suggestions, or reported problems, email me and I will add you here.

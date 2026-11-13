@@ -838,7 +838,7 @@ python stocks_filter/batch_backtest_filter.py # 4. 批量回测 → final_holdin
 
 | 角色 | 成员 |
 |:---|:---|
-| 作者 / 维护者 | **卢心宇** — 需求设计、策略与工程实现、数据验证 |
+| 作者 / 维护者 | **[Leo-luxy](https://github.com/Leo-luxy)** — 需求设计、策略与工程实现、数据验证 |
 | 开发协作 | **dsh**（DeepSeek Harness）— 代码梳理、测试补强与文档整理 |
 
 如果你也用过这个项目、提过建议或反馈过问题，欢迎通过上面的邮箱告诉我，我会把你加进这里。
