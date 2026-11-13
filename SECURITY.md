@@ -18,7 +18,7 @@ To report a security vulnerability:
 
 1. **Do not** open a public issue on GitHub
 2. **Do not** disclose the vulnerability publicly
-3. Send an email to the project maintainers with details of the vulnerability
+3. Send an email to the maintainer at **luxy20061016@gmail.com** with details of the vulnerability
 
 ### What to Include
 

@@ -836,6 +836,22 @@ Omitting `--ticker` makes batch commands process every stock in `STOCK_TICKERS` 
 
 ---
 
+## 📮 Feedback & Contact
+
+Found a bug, ran into a problem, or have a suggestion? Email me directly:
+
+**📧 [luxy20061016@gmail.com](mailto:luxy20061016@gmail.com)**
+
+To help me diagnose faster, please include:
+
+- OS and Python version (e.g. macOS 14 / Python 3.10.15)
+- Which feature failed (screening / backtest / analysis / sector …) and a screenshot of the page message
+- The last ~20 lines of the terminal error, if any
+- The name of the generated log/status file under `data/`
+
+> This is a personally maintained open-source project; I reply as time allows. You can also open a [GitHub Issue](https://github.com/Leo-luxy/GP_ANA/issues).
+
+---
 ## 📄 Version History
 
 | Version | Date | Highlights |

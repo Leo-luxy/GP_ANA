@@ -802,6 +802,22 @@ python stocks_filter/batch_backtest_filter.py # 4. 批量回测 → final_holdin
 
 ---
 
+## 📮 反馈与联系
+
+使用过程中遇到问题、发现 bug，或者有功能建议，欢迎直接发邮件给我：
+
+**📧 [luxy20061016@gmail.com](mailto:luxy20061016@gmail.com)**
+
+为了更快定位问题，来信时建议附上：
+
+- 操作系统与 Python 版本（例如 macOS 14 / Python 3.10.15）
+- 出问题的功能（选股 / 回测 / 个股分析 / 板块分析 …）以及页面提示的截图
+- 终端报错的最后 20 行（如果有）
+- `data/` 目录里对应生成的日志或状态文件名
+
+> 这是个人维护的开源项目，我会尽量回复；也可以直接在 GitHub 提 [Issue](https://github.com/Leo-luxy/GP_ANA/issues)。
+
+---
 ## 📄 版本历史
 
 | 版本 | 日期 | 主要变更 |
