@@ -569,6 +569,14 @@
             <!-- 选股结果 -->
             <div id="selection-result" class="mt-4" style="display: none;">
                 <h5>选股结果</h5>
+                <div class="mb-2">
+                    <label for="selection-history-select" class="small text-muted mb-0">查看日期：</label>
+                    <select id="selection-history-select" class="form-select form-select-sm d-inline-block"
+                            style="width: auto;" onchange="loadSelectionHistory()">
+                        <option value="">最近结果</option>
+                    </select>
+                    <span id="selection-history-note" class="small text-muted ms-2"></span>
+                </div>
                 <div id="selection-result-content"></div>
             </div>
             
@@ -769,12 +777,29 @@
                     // 继续轮询
                     setTimeout(() => pollTaskStatus(taskId), 2000);
                 } else if (data.status === 'completed') {
-                    // 任务完成，显示报告列表
-                    statusContent.innerHTML = `<div class="alert alert-success">任务完成！</div>`;
-                    setTimeout(() => {
-                        document.getElementById('task-status').style.display = 'none';
-                        loadReports();
-                    }, 1000);
+                    if (data.degraded) {
+                        // 可选数据步骤未成功：显式降级，不能显示成完全成功
+                        let warnings = data.warnings || [];
+                        let warningHtml = warnings.map(msg => `<div>⚠️ ${msg}</div>`).join('');
+                        statusContent.innerHTML = `
+                            <div class="alert alert-warning">
+                                任务已完成，但存在降级项（以下可选步骤未成功，相关证据可能缺失）：<br>
+                                ${warningHtml}
+                            </div>
+                        `;
+                        setTimeout(() => {
+                            loadReports();
+                            // loadReports 会隐藏任务框：降级提示需要留在页面上，重新显示
+                            document.getElementById('task-status').style.display = 'block';
+                        }, 1500);
+                    } else {
+                        // 任务完成，显示报告列表
+                        statusContent.innerHTML = `<div class="alert alert-success">任务完成！</div>`;
+                        setTimeout(() => {
+                            document.getElementById('task-status').style.display = 'none';
+                            loadReports();
+                        }, 1000);
+                    }
                 } else if (data.status === 'failed') {
                     // 任务失败
                     let messages = data.messages || [];
@@ -1406,6 +1431,11 @@
             document.getElementById('stock-selection-page').style.display = 'none';
             document.getElementById('backtest-page').style.display = 'block';
 
+            // 刷新后按上次实际运行的策略恢复（页面不重载时 JS 状态会丢，导致回退到 full 读到空报告）
+            lastBacktestMode = localStorage.getItem('lastBacktestMode') || lastBacktestMode;
+            const simplifiedBox = document.getElementById('use-simplified');
+            if (simplifiedBox) simplifiedBox.checked = (lastBacktestMode === 'simple');
+
             // 加载已有的监控报告和股票列表
             loadBacktestReport();
             loadBacktestStockList();
@@ -1418,7 +1448,16 @@
             
             // 获取用户选择的策略版本
             const useSimplified = document.getElementById('use-simplified').checked;
-            
+            // 记录本次策略，报告/结果接口按策略读取对应文件，避免 full 读到 simple
+            lastBacktestMode = useSimplified ? 'simple' : 'full';
+            localStorage.setItem('lastBacktestMode', lastBacktestMode);
+
+            // 新运行开始先清空旧报告和图表，避免失败后仍残留旧状态。
+            document.getElementById('backtest-report').style.display = 'none';
+            document.getElementById('backtest-stock-list').style.display = 'none';
+            document.getElementById('backtest-report-content').textContent = '';
+            document.getElementById('backtest-stocks-container').textContent = '';
+            document.getElementById('chartImage').removeAttribute('src');
             // 显示任务状态
             document.getElementById('backtest-task-status').style.display = 'block';
             document.getElementById('backtest-status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
@@ -1450,13 +1489,15 @@
         function pollBacktestStatus(taskId) {
             const statusContent = document.getElementById('backtest-status-content');
             
+            const escapeLog = value => String(value ?? '').replace(/[&<>"']/g,
+                c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
             fetch(`/api/backtest/task_status/${taskId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'running') {
                     let progress = data.progress || 0;
                     let messages = data.messages || [];
-                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    let messageHtml = messages.map(msg => `<div>${escapeLog(msg)}</div>`).join('');
                     statusContent.innerHTML = `
                         <div class="progress mb-3">
                             <div class="progress-bar bg-dark" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">${progress}%</div>
@@ -1472,20 +1513,33 @@
                         }
                     }, 100);
                     setTimeout(() => pollBacktestStatus(taskId), 2000);
-                } else if (data.status === 'completed') {
-                    statusContent.innerHTML = `<div class="alert alert-success">回测完成！</div>`;
-                    setTimeout(() => {
-                        document.getElementById('backtest-task-status').style.display = 'none';
-                        loadBacktestReport();
-                        loadBacktestStockList();
-                    }, 1000);
+                } else if (data.status === 'completed' || data.status === 'degraded') {
+                    if (data.degraded || data.status === 'degraded') {
+                        const warning = document.createElement('div');
+                        warning.className = 'alert alert-warning';
+                        warning.textContent = '回测完成但数据有降级项：' + (data.warnings || []).join('；');
+                        statusContent.replaceChildren(warning);
+                    } else {
+                        statusContent.innerHTML = `<div class="alert alert-success">回测完成！</div>`;
+                    }
+                    loadBacktestReport();
+                    loadBacktestStockList();
                 } else if (data.status === 'failed') {
                     let messages = data.messages || [];
-                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
-                    statusContent.innerHTML = `<div class="alert alert-danger">回测失败：<br>${messageHtml}</div>`;
+                    let messageHtml = messages.map(msg => `<div>${escapeLog(msg)}</div>`).join('');
+                    const reason = data.error_summary || [...messages].reverse().find(
+                        msg => /失败|异常|过期|未达到/.test(msg)) || '回测未完成，请展开日志查看原因';
+                    statusContent.innerHTML = `
+                        <div class="alert alert-danger">${escapeLog(reason)}</div>
+                        <details class="mt-2">
+                            <summary>查看详细日志（${messages.length} 条）</summary>
+                            <div class="border p-3 mt-2" style="max-height: 320px; overflow-y: auto; overflow-wrap: anywhere;">
+                                ${messageHtml}
+                            </div>
+                        </details>`;
                 } else if (data.status === 'pending') {
                     let messages = data.messages || [];
-                    let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
+                    let messageHtml = messages.map(msg => `<div>${escapeLog(msg)}</div>`).join('');
                     statusContent.innerHTML = `
                         <div class="progress mb-3">
                             <div class="progress-bar bg-dark" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">等待处理...</div>
@@ -1504,13 +1558,25 @@
             });
         }
         
+        // 记住最近一次回测选择的策略，报告接口按策略区分文件
+        let lastBacktestMode = localStorage.getItem('lastBacktestMode') || 'full';
+
         function loadBacktestReport() {
-            fetch('/api/backtest/get_report')
+            fetch('/api/backtest/get_report?mode=' + encodeURIComponent(lastBacktestMode))
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     const htmlContent = marked.parse(data.content);
-                    document.getElementById('backtest-report-content').innerHTML = `<div class="markdown-body">${htmlContent}</div>`;
+                    // 报告可能来自另一套策略或未通过身份校验，如实提示，但不挡住展示。
+                    const notes = [];
+                    if (data.warning) notes.push(data.warning);
+                    if (data.mode && data.mode !== lastBacktestMode) {
+                        notes.push('当前展示的是「' + (data.mode === 'simple' ? '简化版' : '完整版') + '」策略报告');
+                    }
+                    const noteHtml = notes.length
+                        ? '<div class="alert alert-warning py-2">' + notes.join('；') + '</div>' : '';
+                    document.getElementById('backtest-report-content').innerHTML =
+                        noteHtml + `<div class="markdown-body">${htmlContent}</div>`;
                     document.getElementById('backtest-report').style.display = 'block';
                 } else {
                     document.getElementById('backtest-report-content').innerHTML = `<div class="alert alert-info">${data.message}</div>`;
@@ -1523,7 +1589,7 @@
         }
         
         function loadBacktestStockList() {
-            fetch('/api/backtest/get_stock_list')
+            fetch('/api/backtest/get_stock_list?mode=' + encodeURIComponent(lastBacktestMode))
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1546,6 +1612,9 @@
                         });
                         stocksHtml += '</div>';
                     }
+                    if (data.warning) {
+                        stocksHtml = '<div class="alert alert-warning py-2">' + data.warning + '</div>' + stocksHtml;
+                    }
                     document.getElementById('backtest-stocks-container').innerHTML = stocksHtml;
                     document.getElementById('backtest-stock-list').style.display = 'block';
                 } else {
@@ -1558,8 +1627,13 @@
         }
         
         function viewBacktestChart(chartPath) {
-            const imgUrl = `/api/backtest/get_chart/${chartPath}`;
-            document.getElementById('chartImage').src = imgUrl;
+            const imgUrl = '/api/backtest/get_chart/' + chartPath.split('/').map(encodeURIComponent).join('/') + '?mode=' + encodeURIComponent(lastBacktestMode);
+            const image = document.getElementById('chartImage');
+            image.onerror = () => {
+                image.removeAttribute('src');
+                document.getElementById('chartModalLabel').textContent = '图表文件不可读，请重新回测';
+            };
+            image.src = imgUrl;
             document.getElementById('chartModalLabel').textContent = chartPath.split('/')[0] + ' 回测图表';
 
             const modal = new bootstrap.Modal(document.getElementById('chartModal'));
@@ -1810,6 +1884,10 @@
             document.getElementById('sector-analysis-page').style.display = 'none';
             document.getElementById('watchlist-page').style.display = 'none';
             document.getElementById('stock-selection-page').style.display = 'block';
+            // 默认进入结果视图；上次限流/失败不反复挡住表格，运行中的进度仍保留。
+            if (!document.getElementById('selection-status-content').querySelector('.progress')) {
+                document.getElementById('selection-task-status').style.display = 'none';
+            }
             loadSelectionResult();
         }
 
@@ -1822,6 +1900,8 @@
                 return;
             }
             
+            // 新任务与历史结果分开：运行/失败都保留最近一次结果。
+            loadSelectionResult();
             document.getElementById('selection-task-status').style.display = 'block';
             document.getElementById('selection-status-content').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">处理中...</span></div></div>';
             
@@ -1851,13 +1931,18 @@
             fetch(`/api/stock_selection/task_status/${taskId}`)
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'running') {
+                if (data.status === 'running' || data.status === 'pending') {
                     let progress = data.progress || 0;
                     let messages = data.messages || [];
                     let messageHtml = messages.slice(-20).map(msg => `<div>${msg}</div>`).join('');
                     statusContent.innerHTML = `
-                        <div class="progress mb-3">
-                            <div class="progress-bar bg-purple" role="progressbar" style="width: ${progress}%" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">${progress}%</div>
+                        <div class="progress mb-2" style="height: 22px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 style="width: ${progress}%; background-color: #6f42c1;"
+                                 aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
+                                ${progress}% ${data.progress_label || ''}
+                            </div>
                         </div>
                         <div class="border p-3" style="max-height: 400px; overflow-y: auto;" id="selection-message-container">
                             ${messageHtml}
@@ -1870,6 +1955,18 @@
                         }
                     }, 100);
                     setTimeout(() => pollSelectionTaskStatus(taskId), 2000);
+                } else if (data.status === 'degraded' || (data.status === 'completed' && data.degraded)) {
+                    const warning = document.createElement('div');
+                    warning.className = 'alert alert-warning';
+                    warning.textContent = '筛选已结束，但有股票未处理成功：名单只含已完成校验的股票（见下方表格），未处理项如下。 ' + (data.warnings || []).join('；');
+                    statusContent.replaceChildren(warning);
+                    loadSelectionResult();
+                } else if (data.status === 'completed' && data.result_kind === 'preliminary') {
+                    const info = document.createElement('div');
+                    info.className = 'alert alert-info';
+                    info.textContent = '初步筛选完成，候选 ' + (data.candidates || []).length +
+                        ' 只；本轮没有生成最终持仓，需要最终持仓请勾选“详细回测”再跑一次。';
+                    statusContent.replaceChildren(info);
                 } else if (data.status === 'completed') {
                     statusContent.innerHTML = `<div class="alert alert-success">任务完成！</div>`;
                     setTimeout(() => {
@@ -1879,6 +1976,7 @@
                     let messages = data.messages || [];
                     let messageHtml = messages.map(msg => `<div>${msg}</div>`).join('');
                     statusContent.innerHTML = `<div class="alert alert-danger">任务失败：<br>${messageHtml}</div>`;
+                    loadSelectionResult();
                 } else {
                     statusContent.innerHTML = `<div class="alert alert-warning">任务不存在</div>`;
                 }
@@ -1888,71 +1986,126 @@
             });
         }
 
-        function loadSelectionResult() {
-            fetch('/api/stock_selection/get_result')
+        function renderSelectionResult(data) {
+            const view = document.getElementById('selection-result-content');
+            document.getElementById('selection-result').style.display = 'block';
+            if (data.success && data.data && data.data.length > 0) {
+                const allColumns = Object.keys(data.data[0]);
+                // 当前日期即数据截止日，二者重复，只保留一列；处理时间单独保留。
+                const displayCols = ['股票代码', '入场日期', '入场价格', '当前日期', '当前价格', '收益', '离场类型', '处理时间'];
+                const columns = displayCols.filter(c => allColumns.includes(c));
+                function isDateCol(col) { return col.includes('日期') || col.includes('时间') || col.includes('截止日'); }
+                function isCodeCol(col) { return col.includes('代码'); }
+                function isPercentCol(col) { return col.includes('%') || col === '收益'; }
+                function formatCell(col, value) {
+                    if (value === undefined || value === null || value === '') return '-';
+                    const text = String(value).trim();
+                    // 数据截止日与当前日期统一成 YYYY-MM-DD，避免 20261113.00 这种误格式化。
+                    if (col.includes('时间')) {
+                        // 处理时间是“日期 时分秒”，不能被截成只剩日期
+                        return /^\d{8}$/.test(text)
+                            ? text.slice(0, 4) + '-' + text.slice(4, 6) + '-' + text.slice(6) : text;
+                    }
+                    if (isDateCol(col)) {
+                        if (/^\d{8}$/.test(text)) return text.slice(0, 4) + '-' + text.slice(4, 6) + '-' + text.slice(6);
+                        if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+                        return text;
+                    }
+                    const num = parseFloat(text);
+                    if (!isNaN(num) && !isCodeCol(col)) { return num.toFixed(2); }
+                    return text;
+                }
+                function getCellStyle(col, value) {
+                    const num = parseFloat(value);
+                    if (!isNaN(num) && isPercentCol(col)) { return num >= 0 ? 'color: green;' : 'color: red;'; }
+                    return '';
+                }
+                let resultHtml = '';
+                if (data.warnings && data.warnings.length) {
+                    resultHtml += '<div class="alert alert-warning py-2">' + data.warnings.join('；') + '</div>';
+                }
+                if (data.is_current === false) {
+                    resultHtml += '<div class="text-muted small mb-2">数据截止 ' + (data.data_asof || '未知') +
+                        '（历史保存结果），更新成功后会自动替换</div>';
+                }
+                if (data.excluded_bj && data.excluded_bj.length) {
+                    resultHtml += '<div class="text-muted small mb-2">已跳过北交所 ' + data.excluded_bj.length +
+                        ' 只（不在覆盖范围）：' + data.excluded_bj.join(', ') + '</div>';
+                }
+                resultHtml += '<p class="text-muted mb-2">共 ' + data.data.length + ' 条记录';
+                if (data.source) resultHtml += '（来源: ' + data.source + '）';
+                resultHtml += '</p>';
+                resultHtml += '<div style="overflow-x: auto;">';
+                resultHtml += '<table class="table table-striped table-sm">';
+                resultHtml += '<thead><tr>';
+                columns.forEach(col => { resultHtml += '<th>' + col + '</th>'; });
+                resultHtml += '</tr></thead><tbody>';
+                data.data.forEach(row => {
+                    resultHtml += '<tr>';
+                    columns.forEach(col => {
+                        resultHtml += '<td style="' + getCellStyle(col, row[col]) + '">' + formatCell(col, row[col]) + '</td>';
+                    });
+                    resultHtml += '</tr>';
+                });
+                resultHtml += '</tbody></table></div>';
+                view.innerHTML = resultHtml;
+            } else if (data.success) {
+                view.innerHTML = '<div class="alert alert-info">暂无选股结果（数据文件为空）</div>';
+            } else {
+                view.innerHTML = '<div class="alert alert-info">' + (data.message || '暂无选股结果') + '</div>';
+            }
+        }
+
+        function loadSelectionHistoryOptions() {
+            fetch('/api/stock_selection/history', { cache: 'no-store' })
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.data && data.data.length > 0) {
-                    // 只显示核心列
-                    const allColumns = Object.keys(data.data[0]);
-                    const displayCols = ['股票代码', '入场日期', '入场价格', '当前日期', '当前价格', '收益', '离场类型', '处理时间'];
-                    const columns = displayCols.filter(c => allColumns.includes(c));
-
-                    function isDateCol(col) { return col.includes('日期') || col.includes('时间'); }
-                    function isCodeCol(col) { return col.includes('代码'); }
-                    function isPercentCol(col) { return col.includes('%') || col === '收益'; }
-
-                    function formatCell(col, value) {
-                        if (value === undefined || value === null || value === '') return '-';
-                        const num = parseFloat(value);
-                        if (!isNaN(num) && !isDateCol(col) && !isCodeCol(col)) {
-                            return num.toFixed(2);
-                        }
-                        return value;
-                    }
-
-                    function getCellStyle(col, value) {
-                        const num = parseFloat(value);
-                        if (!isNaN(num) && isPercentCol(col)) {
-                            return num >= 0 ? 'color: green;' : 'color: red;';
-                        }
-                        return '';
-                    }
-
-                    let resultHtml = '<p class="text-muted mb-2">共 ' + data.data.length + ' 条记录';
-                    if (data.source) resultHtml += '（来源: ' + data.source + '）';
-                    resultHtml += '</p>';
-                    resultHtml += '<div style="overflow-x: auto;">';
-                    resultHtml += '<table class="table table-striped table-sm">';
-                    resultHtml += '<thead><tr>';
-                    columns.forEach(col => { resultHtml += '<th>' + col + '</th>'; });
-                    resultHtml += '</tr></thead><tbody>';
-                    data.data.forEach(row => {
-                        resultHtml += '<tr>';
-                        columns.forEach(col => {
-                            const value = row[col];
-                            const style = getCellStyle(col, value);
-                            resultHtml += '<td style="' + style + '">' + formatCell(col, value) + '</td>';
-                        });
-                        resultHtml += '</tr>';
-                    });
-                    resultHtml += '</tbody></table></div>';
-                    document.getElementById('selection-result-content').innerHTML = resultHtml;
-                    document.getElementById('selection-result').style.display = 'block';
-                } else if (data.success) {
-                    document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-info">暂无选股结果（数据文件为空）</div>';
-                    document.getElementById('selection-result').style.display = 'block';
-                } else {
-                    document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-info">' + data.message + '</div>';
-                    document.getElementById('selection-result').style.display = 'block';
-                }
+                if (!data.success) return;
+                const select = document.getElementById('selection-history-select');
+                if (!select) return;
+                const current = select.value;
+                let options = '<option value="">最近结果</option>';
+                (data.dates || []).forEach(item => {
+                    const label = item.date + '（' + (item.holdings || 0) + ' 只' + (item.degraded ? '，部分缺失' : '') + '）';
+                    options += '<option value="' + item.date + '">' + label + '</option>';
+                });
+                select.innerHTML = options;
+                select.value = current;
             })
+            .catch(() => {});
+        }
+
+        function loadSelectionHistory() {
+            const select = document.getElementById('selection-history-select');
+            const note = document.getElementById('selection-history-note');
+            const date = select ? select.value : '';
+            if (!date) {
+                if (note) note.textContent = '';
+                loadSelectionResult();
+                return;
+            }
+            fetch('/api/stock_selection/history/' + encodeURIComponent(date), { cache: 'no-store' })
+            .then(response => response.json())
+            .then(data => {
+                if (note) note.textContent = data.success ? ('历史留存：' + date) : '';
+                renderSelectionResult(data);
+            })
+            .catch(error => {
+                document.getElementById('selection-result-content').innerHTML =
+                    '<div class="alert alert-danger">读取历史结果失败：' + error.message + '</div>';
+            });
+        }
+
+        function loadSelectionResult() {
+            loadSelectionHistoryOptions();
+            fetch('/api/stock_selection/get_result', { cache: 'no-store' })
+            .then(response => response.json())
+            .then(data => { renderSelectionResult(data); })
             .catch(error => {
                 document.getElementById('selection-result-content').innerHTML = '<div class="alert alert-danger">加载结果失败：' + error.message + '</div>';
                 document.getElementById('selection-result').style.display = 'block';
             });
         }
-
         // 关注股票相关函数
         function showWatchlist() {
             document.getElementById('main-page').style.display = 'none';

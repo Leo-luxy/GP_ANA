@@ -100,9 +100,18 @@ def save_margin_data(ticker, data, date_str, existing_dates=None):
         return True
     return False
 
-def batch_collect_margin_data(start_date=None, end_date=None):
+def batch_collect_margin_data(start_date=None, end_date=None, tickers=None):
+    """批量/单只获取融资融券数据。
+
+    tickers 为 None 时按 data 目录里所有股票处理；给出列表时只处理这些股票
+    （check_data_updates.py 的日更调用依赖 --ticker 单只模式）。
+    """
+
     """批量获取所有股票的融资融券数据（自动日期范围+查重处理）"""
-    stocks = get_all_stocks()
+    stocks = list(tickers) if tickers else get_all_stocks()
+    if not stocks:
+        print("没有需要处理的股票")
+        return
     print(f"找到 {len(stocks)} 只股票")
     
     if not stocks:
@@ -219,10 +228,19 @@ def main():
     parser = argparse.ArgumentParser(description='批量获取股票融资融券数据')
     parser.add_argument('--start_date', type=str, help='开始日期，格式：YYYYMMDD')
     parser.add_argument('--end_date', type=str, help='结束日期，格式：YYYYMMDD')
+    parser.add_argument('--ticker', type=str, help='只处理指定股票，如 300433.SZ')
+    parser.add_argument('--tickers', type=str,
+                        help='逗号分隔的多只股票；每交易日只抓一次全市场数据再分发，避免逐只重复请求')
     args = parser.parse_args()
-    
-    print("开始批量获取融资融券数据...")
-    batch_collect_margin_data(args.start_date, args.end_date)
+
+    if args.ticker and args.tickers:
+        parser.error('--ticker 与 --tickers 不能同时使用')
+    tickers = [args.ticker] if args.ticker else None
+    if args.tickers:
+        tickers = [t.strip() for t in args.tickers.split(',') if t.strip()]
+        print(f"批量模式：{len(tickers)} 只股票，每个交易日只抓一次全市场数据")
+    print("开始批量获取融资融券数据..." if not tickers else f"开始获取 {args.ticker} 融资融券数据...")
+    batch_collect_margin_data(args.start_date, args.end_date, tickers=tickers)
 
 if __name__ == "__main__":
     main()

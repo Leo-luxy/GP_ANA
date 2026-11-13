@@ -34,6 +34,12 @@ config.py
 
 # 选股流水线产物（stocks_filter/ 四步自动生成，重跑即可还原）
 stocks_filter/*.csv
+stocks_filter/*_status.json
+stocks_filter/*_latest_success.json
+stocks_filter/*_legacy_display.json
+
+# 按交易日留存的选股结果（复盘用，属个人数据，不入库）
+stocks_filter/selection_history/
 
 # Apple Numbers 工作文件
 *.numbers

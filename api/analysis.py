@@ -78,10 +78,45 @@ def get_reports(stock_code):
     return jsonify({'success': True, 'reports': reports})
 
 
+# 报告读取的安全边界：只允许 data/ 目录内、且扩展名在白名单内的文件
+DATA_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+ALLOWED_REPORT_EXTENSIONS = ('.md', '.json', '.csv', '.txt')
+
+
+def _resolve_report_path(report_path):
+    """校验并解析报告路径，返回可读取的绝对路径；不合法时抛 ValueError。
+
+    约束：
+        * 禁止绝对路径与 '..' 路径段；
+        * realpath 解析（含符号链接）后必须位于 data/ 目录内；
+        * 扩展名必须在白名单内。
+    """
+    if not report_path or report_path.startswith(('/', '\\')):
+        raise ValueError('报告路径不能为空且不能是绝对路径')
+    if '\x00' in report_path:
+        raise ValueError('报告路径包含非法字符')
+
+    normalized = report_path.replace('\\', '/')
+    if any(segment == '..' for segment in normalized.split('/')):
+        raise ValueError('报告路径不允许包含 ..')
+
+    data_root = os.path.realpath(DATA_ROOT)
+    candidate = os.path.realpath(os.path.join(data_root, report_path))
+    if candidate != data_root and not candidate.startswith(data_root + os.sep):
+        raise ValueError('报告路径超出 data 目录范围')
+    if os.path.splitext(candidate)[1].lower() not in ALLOWED_REPORT_EXTENSIONS:
+        raise ValueError(f"不允许读取该类型文件（仅支持 {'/'.join(ALLOWED_REPORT_EXTENSIONS)}）")
+    return candidate
+
+
 @analysis_bp.route('/report/<path:report_path>')
 def get_report_content(report_path):
-    file_path = os.path.join('data', report_path)
-    if not os.path.exists(file_path):
+    try:
+        file_path = _resolve_report_path(report_path)
+    except ValueError as e:
+        return jsonify({'success': False, 'message': f'非法报告路径：{e}'})
+
+    if not os.path.isfile(file_path):
         return jsonify({'success': False, 'message': '报告文件不存在'})
 
     try:

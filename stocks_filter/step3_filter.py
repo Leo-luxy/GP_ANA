@@ -53,6 +53,13 @@ print(f"条件5 - 振幅 >= 3.5%: {len(qualified)}")
 qualified = qualified[qualified['涨跌幅(%)'] > 0].copy()  # 当日收涨
 print(f"条件6 - 当日收涨: {len(qualified)}")
 
+# 北交所不在覆盖范围：不取数、不回测，直接从候选池剔除（避免被误计为失败）
+if '股票代码' in qualified.columns:
+    before = len(qualified)
+    qualified = qualified[~qualified['股票代码'].astype(str).str.upper().str.endswith('.BJ')].copy()
+    if before != len(qualified):
+        print(f"剔除北交所 {before - len(qualified)} 只（不在覆盖范围）")
+
 print(f"\n最终筛选后 {len(qualified)} 只股票")
 
 # 5. 保存到 CSV

@@ -76,6 +76,7 @@ GP_ANA/
 ├── daily/                  # 日线策略、指标计算、可视化
 ├── weekly/                 # 周线策略
 ├── stocks_filter/          # 全市场筛选流水线（4 步，需 Tushare token）
+│   └── selection_history/  #   按交易日留存的最终名单（复盘用，gitignore）
 ├── shenwan_config/         # 申万行业阈值配置系统
 ├── templates/              # index.html 单页前端
 ├── static/                 # 静态资源
@@ -85,6 +86,13 @@ GP_ANA/
 ├── trading_records.py      # 持仓记录（gitignore，由 example 复制）
 ├── watchlist.py            # 自选股列表
 ├── utils.py                # 技术指标计算核心
+├── tushare_client.py       # Tushare 主备 token 池（限流自动切换）
+├── selection_snapshot.py   # 选股整批统一交易日 + 隔离行情快照
+├── selection_result_store.py # 最近成功结果 / 按日留存 / 历史读取
+├── backtest_artifacts.py   # 回测产物身份与时效（schema 2）
+├── indicator_provenance.py # 行情到指标的来源绑定（SHA256 + 计算版本）
+├── strategy_params.py      # 策略参数唯一来源（full/simple）
+├── net_guard.py            # 网络代理守护（默认直连）
 └── web_ui.py               # Web 服务入口
 ```
 
@@ -781,6 +789,33 @@ python check_data_updates.py --mode all      --ticker 300433.SZ  # 全部
 
 > 💡 该报告由 Web 界面「策略回测」页面读取展示（`api/backtest.py` 的 `/get_report`）。
 > 报告按日期命名，取最新一份的逻辑见 `api/backtest.py` 的 `_latest_file()`。
+>
+> **展示策略（2026-11-13 放宽）**：报告与图表都先找身份完整的产物（本策略 → 另一策略），都没有则展示**最近一份可读文件**并返回 `verified=false` + `warning`，页面照常渲染并加黄条提示；图表接口对未核验图片返回 200 并带 `X-Chart-Verified: false` 头。身份校验只用于判定“是否可信”，不再直接挡住展示。
+>
+> **选股结果表列**：`当前日期` 与 `数据截止日` 语义相同，页面只显示一列；`处理时间` 保留到秒。
+
+### 5.23 stocks_filter/ 选股流水线（四个脚本 + 三个支撑模块）
+
+**定位**：从全市场 5500+ 只股票中按「活跃 + 有波动 + 当日收涨」筛出候选池，逐只趋势回测，输出当期最终持仓名单。
+
+| 步骤 | 脚本 | 产出 |
+|---|---|---|
+| 1 | `stocks_filter/step1_daily.py` | `stocks_daily_temp.csv`（Tushare 单交易日全市场日线） |
+| 2 | `stocks_filter/step2_daily_basic.py` | `stocks_daily_full.csv`（合并换手率/市值/PE/PB） |
+| 3 | `stocks_filter/step3_filter.py` | `stocks_daily_filtered.csv`（候选池，剔除北交所） |
+| 4 | `stocks_filter/batch_backtest_filter.py` | `final_holdings.csv` + `final_holdings_status.json` |
+
+**交易日确定（18:00 切点）**：`check_data_updates.get_calendar_trade_date()` 约定 18:00 前按上一交易日、18:00 后按当日。step1 的探测与真正取数使用**同一个** `pro.daily` 接口，探测成功即代表取数可用；交易日历不可用时用工作日候选兜底，不再依赖会滞后一天的第三方接口。最终日期若比期望日旧会打印醒目警告。
+
+**全市场齐备判定**：以前一交易日沪深代码全集为基准比对当日覆盖率。缺失占比不超过 0.5%（约 28 只）判为个别停牌/退市，仍用当日；成规模缺失才整批回退前一交易日。逻辑在 `selection_snapshot.evaluate_market_gap()`。
+
+**整批统一日期**：`selection_snapshot.py` 决定本轮唯一截止日 D，把候选行情截断到 D 生成隔离快照，指标与回测都在快照内重算（引擎 `--data-dir`）；真实 `data/` 不会被截断或覆盖。候选池日期与 D 不一致时（如今日初筛配昨日回测）会按 D 重建整套初筛。
+
+**每日留存（复盘依据）**：每次成功（含降级）批筛把名单归档到 `stocks_filter/selection_history/<YYYYMMDD>/`，含 `final_holdings.csv`、`status.json`（内容指纹）与 `runs.log`；同日多次运行只更新固定名文件、保留历次快照。失败、限流、仅初筛不写入。
+
+**退出码**：0 正常（含降级）、1 输入异常、2 结果身份或时效异常、3 系统性失败（全失败或失败过半）；`--limit` 为诊断模式，结果标 void，不作为当前持仓。
+
+**Tushare 主备 token**：`tushare_client.TusharePool` 代理 `ts.pro_api`，命中「频率超限」自动换下一个 token 重试同一请求并记住可用者；全部限流才抛限流异常（此时 step2 复用同交易日缓存）。可用环境变量 `GP_TUSHARE_TOKENS` 覆盖。
 
 ---
 
@@ -1279,6 +1314,21 @@ python batch_analyze.py --mode periodic --ticker 300433.SZ   # 低频 3 步
 | 时间标注 | 每个指标标明对应的时间点 |
 | 数据排序 | 统一按日期升序，消除顺序歧义 |
 
+### 11.7 选股与回测的时效、身份闭环
+
+这一轮修复的共同主题：**「命令成功」不等于「数据正确」，「文件存在」不等于「结果可信」**。
+
+| 问题 | 曾经的表现 | 现行做法 |
+|---|---|---|
+| 行情日期看日历 | 收盘后立刻要求当日数据，源未发布就整批报错 | 18:00 发布切点；验证用本地实际可取到的最新行情，并区分停牌与未发布 |
+| 混合日期 | 一部分股票今天、一部分昨天 | 整批冻结唯一截止日 D，隔离快照内计算；结果行与来源快照都必须等于 D |
+| 回测产物身份 | 按文件名排序或 mtime 取最新，混入 175 天前记录 | `backtest_artifacts` schema 2：运行身份 + 参数指纹 + 来源快照 + 内容 SHA256 |
+| 指标来源 | 只比日期，复权重建后仍用旧指标 | `indicator_provenance` 绑定 qfq 与指标整文件 SHA256 + 计算代码版本 |
+| 失败可观测 | 卡住、假成功、报错淹没在日志里 | 真实退出码 + degraded/void 状态 + 失败摘要（详细日志默认折叠限高） |
+| 历史复盘 | 每次运行覆盖同一份 `final_holdings.csv` | 按交易日归档到 `selection_history/`，同日多次保留运行日志 |
+| Token 限流 | 一次撞限就整批失败 | `TusharePool` 主备 token 自动切换；全部限流才复用同交易日缓存 |
+
+**经验教训**：本次多个故障都源于「同一概念在两处各写一套判断」（日期、限流、来源校验、报告身份）。收敛到单一函数或单一来源后，同类问题才真正消失。
 ---
 
 ## 12. 已知限制与后续方向

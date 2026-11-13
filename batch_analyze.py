@@ -12,9 +12,15 @@ import argparse
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from config import STOCK_TICKERS
 
+# 用当前解释器执行子步骤，避免登录 shell 把 python 解析到别的环境
+PYTHON = sys.executable or 'python'
+
 
 def run_command(command, stock=None):
-    """运行 shell 命令并计时"""
+    """运行 shell 命令并计时，返回真实退出码（失败不再只打印"警告"）"""
+    # 步骤里写的是裸 python，这里统一换成当前解释器，避免解析到别的 conda 环境
+    if command.startswith('python '):
+        command = f'"{PYTHON}" ' + command[len('python '):]
     if stock:
         print(f"\n=== 正在处理股票: {stock} ===")
     print(f"执行命令: {command}")
@@ -23,19 +29,23 @@ def run_command(command, stock=None):
     elapsed = time.time() - start_time
     print(f"执行时间: {elapsed:.2f}秒")
     if result != 0:
-        print(f"警告: 命令执行失败，返回码: {result}")
+        print(f"错误: 命令执行失败，返回码: {result}")
     return result
 
 
 def run_steps(stock_code, steps, mode_name):
-    """依次执行步骤列表"""
+    """依次执行步骤列表，返回失败步骤清单（不静默吞掉失败）"""
     print(f"\n{'='*50}")
     print(f"开始 {mode_name} 分析: {stock_code}")
     print(f"{'='*50}")
 
+    failures = []
     for i, (step_name, command) in enumerate(steps, 1):
         print(f"\n[{i}/{len(steps)}] {step_name}")
-        run_command(command, stock=stock_code)
+        code = run_command(command, stock=stock_code)
+        if code != 0:
+            failures.append((stock_code, step_name, code))
+    return failures
 
 
 def get_all_steps(stock_code):
@@ -85,10 +95,12 @@ def main():
 
     mode_names = {'all': '完整', 'daily': '日更数据', 'periodic': '定期数据'}
 
+    failures = []
+
     if args.ticker:
         stock_code = args.ticker
         steps = get_all_steps(stock_code)[args.mode]
-        run_steps(stock_code, steps, mode_names[args.mode])
+        failures.extend(run_steps(stock_code, steps, mode_names[args.mode]))
     else:
         tickers = list(STOCK_TICKERS.values())
         print(f"=== 批量 {mode_names[args.mode]} 分析开始 ===")
@@ -96,10 +108,18 @@ def main():
 
         for stock_code in tickers:
             steps = get_all_steps(stock_code)[args.mode]
-            run_steps(stock_code, steps, mode_names[args.mode])
+            failures.extend(run_steps(stock_code, steps, mode_names[args.mode]))
 
         print("\n=== 批量分析完成 ===")
 
+    if failures:
+        print(f"\n以下 {len(failures)} 个步骤失败：")
+        for stock_code, step_name, code in failures:
+            print(f"  - {stock_code} / {step_name}（返回码 {code}）")
+        print("请按上面的失败清单排查，不要用旧结果充当本次结果。")
+        return 1
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -18,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils import calculate_technical_indicators
 from config import DATA_DIR
+from indicator_provenance import write_indicators, IndicatorProvenanceError
+from backtest_artifacts import file_sha256
 
 
 def calculate_ema(data_df, periods=[5, 10, 20, 50, 60, 120, 200]):
@@ -45,8 +47,7 @@ def read_local_data(ticker, input_dir=None):
         base_dir = input_dir
     else:
         # 使用项目根目录作为基准
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        base_dir = os.path.join(project_root, 'data')
+        base_dir = DATA_DIR
     
     # 构建文件路径
     stock_dir = os.path.join(base_dir, ticker)
@@ -59,7 +60,12 @@ def read_local_data(ticker, input_dir=None):
     
     # 读取文件
     try:
-        df = pd.read_csv(file_path)
+        source_sha = file_sha256(file_path)
+        df = pd.read_csv(file_path, float_precision='round_trip')
+        if file_sha256(file_path) != source_sha:
+            raise IndicatorProvenanceError('读取期间行情已改变')
+        df.attrs['source_path'] = file_path
+        df.attrs['source_sha256'] = source_sha
         print(f"读取本地数据成功，共 {len(df)} 条记录")
         
         # 确保必要的列存在
@@ -78,15 +84,14 @@ def read_local_data(ticker, input_dir=None):
         return None
 
 
-def save_results(df, ticker, output_dir=None):
+def save_results(df, ticker, output_dir=None, source_path=None, expected_source_sha256=None):
     """保存计算结果到本地文件"""
     # 确定输出目录
     if output_dir:
         base_dir = output_dir
     else:
         # 使用项目根目录作为基准
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        base_dir = os.path.join(project_root, 'data')
+        base_dir = DATA_DIR
     
     # 确保目录存在
     stock_dir = os.path.join(base_dir, ticker)
@@ -166,12 +171,11 @@ def save_results(df, ticker, output_dir=None):
     # 按顺序排列列
     df = df[all_columns]
     
-    # 保存文件
-    try:
-        df.to_csv(file_path, index=False, encoding='utf-8-sig')
-        print(f"计算结果已保存到: {file_path}")
-    except Exception as e:
-        print(f"保存文件时出错: {str(e)}")
+    # CSV与来源元数据绑定发布，保存失败必须向上传播。
+    result = write_indicators(df, ticker, base_dir, source_path=source_path,
+                              expected_source_sha256=expected_source_sha256)
+    print(f"计算结果及来源元数据已保存到: {result}")
+    return result
 
 
 def main():
@@ -181,35 +185,29 @@ def main():
     parser.add_argument('--input-dir', help="输入数据目录，默认为config.py中的配置")
     parser.add_argument('--output-dir', help="输出数据目录，默认为config.py中的配置")
     args = parser.parse_args()
-    
-    # 检查ticker参数是否存在
+
     if not args.ticker:
         print("错误：必须指定股票代码，请使用 --ticker 参数")
-        return
-    
-    # 读取本地数据
+        return 1
     df = read_local_data(args.ticker, args.input_dir)
-    
-    if df is not None and not df.empty:
-        # 计算技术指标
+    if df is None or df.empty:
+        print("无法读取数据，计算失败。")
+        return 1
+    source_path = df.attrs['source_path']
+    source_sha = df.attrs['source_sha256']
+    try:
         print("计算技术指标...")
         df = calculate_technical_indicators(df)
-        
-        # 补充计算EMA指标
-        print("计算EMA指标...")
         df = calculate_ema(df)
-        
-        # 补充计算RPS指标
-        print("计算RPS指标...")
         df = calculate_rps(df)
-        
-        # 保存结果
-        save_results(df, args.ticker, args.output_dir)
-        
-        print("计算完成！")
-    else:
-        print("无法读取数据，计算失败。")
+        save_results(df, args.ticker, args.output_dir,
+                     source_path=source_path, expected_source_sha256=source_sha)
+    except Exception as exc:
+        print(f"指标计算/保存失败：{exc}")
+        return 1
+    print("计算完成！")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -29,6 +29,59 @@ class TwoLayerDecisionAnalyzer:
         self.data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', ticker)
         self.strategy_prompt = None  # 交易策略提示
 
+    def _report_evidence_error(self, report_type, report, state, expected_date):
+        """拒绝未经核验的维度，避免将旧报告作为当前信号送入模型。"""
+        from check_data_updates import source_digest
+        if not isinstance(report, dict) or not report:
+            return '报告为空或格式无效'
+        meta = report.get('meta', {})
+        if not isinstance(meta, dict):
+            return '报告元数据无效'
+        if meta.get('ticker', self.ticker) != self.ticker:
+            return '报告股票身份不匹配'
+        for container in (report, meta):
+            if container.get('void') or container.get('valid') is False or container.get('degraded') or container.get('status') in ('failed', 'invalid', 'stale', 'void', 'degraded'):
+                return '报告状态失效或降级'
+        try:
+            generated = datetime.fromisoformat(meta.get('generated_at') or meta.get('analysis_date') or report.get('generated_at') or '')
+            if generated.date() < expected_date or generated > datetime.now() + timedelta(minutes=5):
+                return '报告生成日期过期或在未来'
+        except (TypeError, ValueError):
+            return '报告缺少可核验生成日期'
+        dependencies = {
+            'technical': ('qfq', 'indicators'),
+            'sentiment': ('fund_flow', 'margin_data', 'valuation'),
+            'financial': ('financial_indicators', 'dupont', 'company_basic'),
+            'shareholder': ('shareholder_num', 'shareholder', 'institutional', 'north_holdings'),
+            'research': (),
+        }[report_type]
+        if dependencies:
+            if not state or state.get('schema_version') != 1 or state.get('ticker') != self.ticker or state.get('expected_date') != expected_date.isoformat():
+                return '缺失当前交易日的数据证据状态'
+            for name in dependencies:
+                item = state.get('items', {}).get(name, {})
+                if item.get('valid') is not True:
+                    return f'{name} 数据缺失/失效，禁止消费旧报告'
+                filename = item.get('filename', '')
+                if not filename or os.path.basename(filename) != filename:
+                    return f'{name} 来源路径无效'
+                if not item.get('sha256') or source_digest(os.path.join(self.data_dir, filename)) != item['sha256']:
+                    return f'{name} 来源已变化，报告身份不可核验'
+                try:
+                    checked = datetime.fromisoformat(item['checked_at'])
+                    # 现有报告生产者只保存到秒，比较时仅舍弃检查时间的亚秒部分。
+                    if generated < checked.replace(microsecond=0):
+                        return f'{name} 报告早于本次数据检查'
+                except (KeyError, TypeError, ValueError):
+                    return f'{name} 检查时间无效'
+        if report_type == 'technical':
+            try:
+                from indicator_provenance import validate_indicators
+                validate_indicators(self.ticker, data_dir=os.path.dirname(self.data_dir), expected_asof=expected_date.isoformat())
+            except Exception as exc:
+                return f'技术指标来源版本无效: {exc}'
+        return None
+
     def load_analysis_reports(self):
         """加载五份核心分析报告"""
         report_mapping = {
@@ -39,17 +92,36 @@ class TwoLayerDecisionAnalyzer:
             'research': f"{self.ticker}_research_report_analysis.json"
         }
 
+        from check_data_updates import get_calendar_trade_date, STATUS_PREFIX
+        expected_date = get_calendar_trade_date()
+        state = None
+        self.evidence_warnings = []
+        self.analysis_reports = {name: {} for name in report_mapping}
+        try:
+            with open(os.path.join(self.data_dir, f'{self.ticker}_data_freshness.json'), encoding='utf-8') as stream:
+                state = json.load(stream)
+        except (OSError, ValueError):
+            pass
         for report_type, filename in report_mapping.items():
             file_path = os.path.join(self.data_dir, filename)
             if os.path.exists(file_path):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
-                        self.analysis_reports[report_type] = json.load(f)
+                        report = json.load(f)
+                    error = self._report_evidence_error(report_type, report, state, expected_date)
+                    if error:
+                        self.evidence_warnings.append(f'{report_type}: {error}')
+                        continue
+                    self.analysis_reports[report_type] = report
                     print(f"加载{report_type}分析报告: {file_path}")
                 except Exception as e:
+                    self.evidence_warnings.append(f'{report_type}: 读取失败 {e}')
                     print(f"读取{report_type}分析报告时出错: {str(e)}")
             else:
+                self.evidence_warnings.append(f'{report_type}: 报告缺失')
                 print(f"未找到{report_type}分析报告文件: {file_path}")
+        print(STATUS_PREFIX + json.dumps({'schema_version': 1, 'degraded': bool(self.evidence_warnings),
+                                         'warnings': self.evidence_warnings, 'critical_failures': []}, ensure_ascii=False))
 
     def extract_layer1_data(self):
         """从五份JSON中提取第一层决策信号"""

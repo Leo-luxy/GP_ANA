@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import signal
 import subprocess
 import time
 import threading
@@ -60,10 +61,59 @@ def get_exchange_suffix(stock_code: str) -> str:
 task_queue = queue.Queue()
 task_status = _load_task_status()
 
+def _terminate_process_group(process):
+    """终止子进程及其派生的整棵进程树（进程组），用于超时清理。"""
+    try:
+        if os.name == 'posix':
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        else:
+            process.kill()
+    except ProcessLookupError:
+        pass
+    except Exception:
+        try:
+            process.kill()
+        except Exception:
+            pass
+    try:
+        process.wait(timeout=5)
+    except Exception:
+        pass
+
+
+def _close_process_output(process):
+    """关闭子进程输出管道，避免文件描述符泄漏。"""
+    try:
+        if process.stdout:
+            process.stdout.close()
+    except Exception:
+        pass
+
+
+STATUS_PREFIX = 'GP_DATA_STATUS='
+
+
+def parse_data_status(line):
+    text = line.strip()
+    if not text.startswith(STATUS_PREFIX):
+        return None
+    try:
+        status = json.loads(text[len(STATUS_PREFIX):])
+        if not isinstance(status, dict) or not isinstance(status.get('warnings', []), list) or not isinstance(status.get('critical_failures', []), list):
+            raise ValueError('invalid status schema')
+        return status
+    except (ValueError, TypeError):
+        return {'critical_failures': ['无效的数据状态协议'], 'warnings': []}
+
+
 def execute_step(step_name: str, command: str, cwd: str, messages: list, timeout_seconds: int = 300) -> tuple:
     """
     执行单个 shell 步骤，实时捕获输出。
     返回 (success: bool, detail: str)
+
+    输出由后台线程读入队列，主线程只做带超时的等待，避免子进程长时间
+    不输出时 readline 阻塞、令超时判断失效。超时会杀掉整个进程组
+    （shell 及其派生的所有子进程），返回 False、detail='timeout'。
 
     Args:
         step_name: 步骤名称
@@ -76,100 +126,207 @@ def execute_step(step_name: str, command: str, cwd: str, messages: list, timeout
         messages.append(f'  跳过: {step_name}')
         return True, 'skipped'
 
+    # 步骤命令里写的是裸 python；Web 进程的 PATH 未必指向本项目环境，
+    # 这里统一换成当前解释器，避免子步骤用错 conda 环境而静默失败。
+    if command.startswith('python '):
+        command = f'"{sys.executable}" ' + command[len('python '):]
+
     try:
+        env = os.environ.copy()
+        env.setdefault('PYTHONUNBUFFERED', '1')
         process = subprocess.Popen(
             command,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             bufsize=1,
-            cwd=cwd
+            cwd=cwd,
+            env=env,
+            start_new_session=True,  # 独立进程组，超时可整组终止
         )
 
-        start_time = time.time()
+        output_queue = queue.Queue()
+        reader_done = threading.Event()
 
+        def _reader():
+            """后台逐行读取子进程输出，主线程不再直接阻塞在管道上。"""
+            try:
+                for line in process.stdout:
+                    output_queue.put(line)
+            except Exception:
+                pass
+            finally:
+                reader_done.set()
+
+        reader_thread = threading.Thread(target=_reader, name='step-output-reader', daemon=True)
+        reader_thread.start()
+
+        data_warnings, data_failures = [], []
+        deadline = time.monotonic() + float(timeout_seconds)
         while True:
-            # 检查是否超时
-            if time.time() - start_time > timeout_seconds:
-                process.kill()
-                messages.append(f'  ⚠️ 步骤超时({timeout_seconds}秒)，已终止进程')
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _terminate_process_group(process)
+                _close_process_output(process)
+                messages.append(f'  ⚠️ 步骤超时({timeout_seconds}秒)，已终止进程组')
                 return False, 'timeout'
 
-            # 读取输出
-            line = process.stdout.readline()
-            if line:
-                if line.strip():
-                    messages.append(f'  {line.strip()}')
-            else:
-                # 检查进程是否结束
-                if process.poll() is not None:
+            try:
+                line = output_queue.get(timeout=min(0.1, remaining))
+            except queue.Empty:
+                if process.poll() is not None and reader_done.is_set():
                     break
+                continue
 
-            # 短暂等待
-            time.sleep(0.1)
+            if line is None:
+                break
+            if line.strip():
+                messages.append(f'  {line.strip()}')
+                status = parse_data_status(line)
+                if status is not None:
+                    data_warnings.extend(str(w) for w in status.get('warnings', []))
+                    data_failures.extend(str(w) for w in status.get('critical_failures', []))
+                    if status.get('degraded') and not status.get('warnings'):
+                        data_warnings.append('子进程报告数据降级')
 
-        if process.returncode == 0:
+        returncode = process.wait()
+        _close_process_output(process)
+        if data_failures:
+            return False, '; '.join(data_failures)
+        if returncode == 0:
+            if data_warnings:
+                return True, STATUS_PREFIX + json.dumps({'degraded': True, 'warnings': data_warnings}, ensure_ascii=False)
             return True, 'success'
-        else:
-            return False, f'returncode={process.returncode}'
+        return False, f'returncode={returncode}'
     except Exception as e:
         return False, str(e)
 
+OPTIONAL_STEP_MARKER = '[可选]'
+
+
+def _normalize_step(step):
+    """规范化步骤声明，返回 (名称, 命令, 是否关键步骤)。
+
+    支持三种写法：
+        (名称, 命令)                          —— 关键步骤
+        (名称, 命令, {'critical': False})     —— 可选步骤
+        名称以 [可选] 开头                     —— 可选步骤
+    """
+    if not isinstance(step, (tuple, list)) or len(step) < 2:
+        raise ValueError(f'步骤声明格式错误: {step!r}')
+    name, command = step[0], step[1]
+    options = step[2] if len(step) > 2 and isinstance(step[2], dict) else {}
+    optional = (not bool(options.get('critical', True))) or str(name).startswith(OPTIONAL_STEP_MARKER)
+    if str(name).startswith(OPTIONAL_STEP_MARKER):
+        name = name[len(OPTIONAL_STEP_MARKER):].strip()
+    return name, command, not optional
+
+
+def _step_timeout_seconds(step_name):
+    """根据步骤类型设置不同的超时时间（秒）。"""
+    if step_name.startswith('[采集]'):
+        return 300  # 数据采集：5分钟
+    if step_name.startswith('[计算]'):
+        return 180  # 本地计算：3分钟
+    if step_name.startswith('[分析]'):
+        return 600  # 普通分析：10分钟
+    if step_name.startswith('[摘要]'):
+        return 900  # LLM摘要：15分钟
+    if step_name.startswith('[决策]'):
+        return 1200  # LLM决策：20分钟
+    if step_name.startswith('[综合]'):
+        return 1800  # AI综合分析：30分钟
+    return 300  # 默认5分钟
+
+
 def _execute_steps(task_id, full_stock_code, steps, label):
-    """执行步骤列表的通用逻辑"""
+    """执行步骤列表的通用逻辑。
+
+    关键步骤失败：立即停止后续步骤，任务 status='failed'，消息写明失败步骤与原因。
+    可选步骤失败：继续执行，任务最终 status='completed' 但带 degraded=True 和 warnings，
+    前端据此显式展示「已完成但有降级项」，不会看起来完全成功。
+
+    返回 True 表示全部关键步骤成功（可能出现降级），False 表示关键步骤失败。
+    """
     messages = []
     data_dir = os.path.join(project_root, 'data', full_stock_code)
     os.makedirs(data_dir, exist_ok=True)
 
-    task_status[task_id] = {'status': 'running', 'progress': 0, 'messages': []}
+    task_status[task_id] = {
+        'status': 'running', 'progress': 0, 'messages': [],
+        'stock_code': full_stock_code
+    }
     _save_task_status()
     messages.append(label)
     total_steps = len(steps)
     messages.append(f"共 {total_steps} 个步骤，按顺序执行")
 
-    for i, (step_name, command) in enumerate(steps):
-        messages.append(f'【{i+1}/{total_steps}】{step_name}')
+    normalized_steps = [_normalize_step(step) for step in steps]
+    warnings = []
+
+    for i, (step_name, command, critical) in enumerate(normalized_steps):
+        display_name = step_name if critical else f'{OPTIONAL_STEP_MARKER} {step_name}'
+        messages.append(f'【{i+1}/{total_steps}】{display_name}')
         task_status[task_id] = {
             'status': 'running',
             'progress': int((i / total_steps) * 100),
-            'messages': messages.copy()
+            'messages': messages.copy(),
+            'stock_code': full_stock_code
         }
         _save_task_status()
-        # 根据步骤类型设置不同的超时时间
-        timeout_seconds = 300  # 默认5分钟
 
-        if step_name.startswith('[采集]'):
-            timeout_seconds = 300  # 数据采集：5分钟
-        elif step_name.startswith('[计算]'):
-            timeout_seconds = 180  # 本地计算：3分钟
-        elif step_name.startswith('[分析]'):
-            timeout_seconds = 600  # 普通分析：10分钟
-        elif step_name.startswith('[摘要]'):
-            timeout_seconds = 900  # LLM摘要：15分钟
-        elif step_name.startswith('[决策]'):
-            timeout_seconds = 1200  # LLM决策：20分钟
-        elif step_name.startswith('[综合]'):
-            timeout_seconds = 1800  # AI综合分析：30分钟
-
-        success, result = execute_step(step_name, command, project_root, messages, timeout_seconds)
+        success, result = execute_step(step_name, command, project_root, messages,
+                                       _step_timeout_seconds(step_name))
         if success:
-            messages.append(f'  ✅ {step_name} 完成')
+            status = parse_data_status(result)
+            if status:
+                warnings.extend(str(w) for w in status.get('warnings', []))
+            messages.append(f'  ✅ {display_name} 完成')
+        elif critical:
+            messages.append(f'  ❌ {display_name} 失败：{result}')
+            messages.append(f'关键步骤失败，已停止后续 {total_steps - i - 1} 个步骤')
+            task_status[task_id] = {
+                'status': 'failed',
+                'progress': int(((i + 1) / total_steps) * 100),
+                'messages': messages.copy(),
+                'stock_code': full_stock_code,
+                'failed_step': display_name,
+                'reason': result
+            }
+            _save_task_status()
+            return False
         else:
-            messages.append(f'  ⚠️ {step_name} 完成（警告: {result}）')
+            messages.append(f'  ⚠️ {display_name} 失败：{result}（可选步骤，继续执行）')
+            warnings.append(f'{display_name}: {result}')
+
         task_status[task_id] = {
             'status': 'running',
             'progress': int(((i + 1) / total_steps) * 100),
-            'messages': messages.copy()
+            'messages': messages.copy(),
+            'stock_code': full_stock_code
         }
         _save_task_status()
 
-    task_status[task_id] = {
-        'status': 'completed', 'progress': 100,
-        'messages': messages, 'stock_code': full_stock_code
-    }
+    if warnings:
+        messages.append('========== 分析完成（降级：以下可选步骤未成功，相关证据可能缺失） ==========')
+        for warning in warnings:
+            messages.append(f'  - {warning}')
+        task_status[task_id] = {
+            'status': 'completed', 'progress': 100,
+            'messages': messages, 'stock_code': full_stock_code,
+            'degraded': True, 'warnings': warnings
+        }
+    else:
+        messages.append("========== 分析完成 ==========")
+        task_status[task_id] = {
+            'status': 'completed', 'progress': 100,
+            'messages': messages, 'stock_code': full_stock_code
+        }
     _save_task_status()
-    messages.append("========== 分析完成 ==========")
+    return True
 
 
 # ============================================================
@@ -191,24 +348,28 @@ def run_analysis_task(task_id: str, stock_code: str, task_type: str):
             return
 
         label = "========== 完整分析 · 五维度两层决策 =========="
+        # 补充性质的数据源用第三项 {'critical': False} 标注：失败不阻断主流程，
+        # 但任务最终会带 degraded=True + warnings，前端显式展示降级。
         steps = [
             # --- 数据采集 ---
-            ('[采集] 低频数据', f'python stock_company_info_collector.py --ticker {full_stock_code}'),
-            ('[采集] 北向资金', f'python north_holdings.py --ticker {full_stock_code}'),
-            ('[采集] 财务指标', f'python financial_indicators_collector.py --ticker {full_stock_code}'),
-            ('[采集] 东方财富财务', f'python em_financial_collector.py --ticker {full_stock_code}'),
-            ('[采集] 计算财务指标', f'python calculate_financial_indicators.py --ticker {full_stock_code}'),
+            ('[采集] 低频数据', f'python stock_company_info_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 北向资金', f'python north_holdings.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 财务指标', f'python financial_indicators_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 东方财富财务', f'python em_financial_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 计算财务指标', f'python calculate_financial_indicators.py --ticker {full_stock_code}', {'critical': False}),
             ('[采集] 日更数据', f'python check_data_updates.py --ticker {full_stock_code}'),
-            ('[采集] 业绩预告与分红', f'python important_missing_data_collector.py --ticker {full_stock_code}'),
-            ('[采集] 前十大股东', f'python shareholders_collector.py --ticker {full_stock_code}'),
-            ('[采集] 股东户数', f'python shareholder_num_collector.py --ticker {full_stock_code}'),
-            ('[采集] 机构持股', f'python org_hold_collector.py --ticker {full_stock_code}'),
-            ('[采集] 市场表现', f'python eastmoney_fetcher.py --type market_performance --ticker {full_stock_code}'),
-            ('[采集] 行业估值', f'python eastmoney_fetcher.py --type industry_valuation --ticker {full_stock_code}'),
-            ('[采集] 同行业公司', f'python eastmoney_fetcher.py --type industry_peers --ticker {full_stock_code}'),
-            ('[采集] 行业成长', f'python eastmoney_fetcher.py --type industry_growth --ticker {full_stock_code}'),
-            ('[采集] 杜邦分析', f'python eastmoney_fetcher.py --type dupont --ticker {full_stock_code}'),
-            ('[采集] 申万行业', f'python shenwan_industry_collector.py --ticker {full_stock_code}'),
+            ('[采集] 业绩预告与分红', f'python important_missing_data_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 前十大股东', f'python shareholders_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 股东户数', f'python shareholder_num_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 机构持股', f'python org_hold_collector.py --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 市场表现', f'python eastmoney_fetcher.py --type market_performance --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 行业估值', f'python eastmoney_fetcher.py --type industry_valuation --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 同行业公司', f'python eastmoney_fetcher.py --type industry_peers --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 行业成长', f'python eastmoney_fetcher.py --type industry_growth --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 杜邦分析', f'python eastmoney_fetcher.py --type dupont --ticker {full_stock_code}', {'critical': False}),
+            ('[采集] 申万行业', f'python shenwan_industry_collector.py --ticker {full_stock_code}', {'critical': False}),
+            # 所有采集完成后统一复核，先写完整证据状态，再生成任何维度报告。
+            ('[采集] 全量证据复核', f'python check_data_updates.py --mode all --ticker {full_stock_code}'),
             # --- 技术指标 ---
             ('[计算] 技术趋势数据', f'python calculate_technical_trend_ds.py --ticker {full_stock_code}'),
             # --- 各方面详细分析报告（MD） ---
