@@ -44,9 +44,6 @@ stocks_filter/selection_history/
 # Apple Numbers 工作文件
 *.numbers
 
-# Claude
-CLAUDE.md
-
 # Temp
 *.tmp
 simplified_strategy_results.csv
