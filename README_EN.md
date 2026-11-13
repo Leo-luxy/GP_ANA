@@ -1,6 +1,6 @@
 # GP_ANA — AI-Powered A-Share Analysis System
 
-**Current version: v1.5.0**
+**Current version: v1.6.0**
 
 [中文](README.md) ｜ **English**
 
@@ -835,6 +835,7 @@ Omitting `--ticker` makes batch commands process every stock in `STOCK_TICKERS` 
 
 | Version | Date | Highlights |
 |------|------|---------|
+| **v1.6.0** | 2026-11 | Whole-batch trading-day freezing and per-day result archive for screening; backtest artifact identity (params, source snapshot, content hash); observable failures with degraded/void states; primary/backup Tushare token rotation; single source of strategy parameters; 296 regression tests |
 | **v1.5.0** | 2026-09 | Documentation restructured into README + Introduction; backtest page now shows the latest report; task status persistence; dependency list corrected; redundant scripts removed |
 | **v1.4.0** | 2026-06 | Whole-market screening + watchlist management; KDJ and sector data-freshness fixes; backtest enhancements (watchlist + company names); timeout control |
 | **v1.3.0** | 2026-06 | Sector analysis: four sector types with AI analysis; Sina Finance data source; sector API |
